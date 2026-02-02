@@ -1,0 +1,12 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+*.user
+
+# ASP.NET
+appsettings.Development.json
+
+# OS
+.DS_Store
+Thumbs.db
