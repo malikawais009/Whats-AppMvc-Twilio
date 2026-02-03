@@ -1,0 +1,181 @@
+@model WhatsAppMvcComplete.Models.User
+
+@{
+    ViewData["Title"] = "User Details";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>User Details</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Users">Users</a></li>
+            <li class="breadcrumb-item active">@Model.Name</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>User Information</span>
+                <div>
+                    <a href="@Url.Action("Edit", new { id = Model.Id })" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    <a href="/Messages/Compose?userId=@Model.Id" class="btn btn-primary btn-sm">
+                        <i class="bi bi-send"></i> Send Message
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">ID:</div>
+                    <div class="col-md-9">@Model.Id</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Name:</div>
+                    <div class="col-md-9">@Model.Name</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Phone:</div>
+                    <div class="col-md-9">
+                        <a href="tel:@Model.Phone">@Model.Phone</a>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.WhatsAppNumber))
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">WhatsApp:</div>
+                        <div class="col-md-9">
+                            <a href="https://wa.me/@Model.WhatsAppNumber.Replace("+", "").Replace(" ", "")" target="_blank">
+                                @Model.WhatsAppNumber <i class="bi bi-whatsapp text-success"></i>
+                            </a>
+                        </div>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.Email))
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Email:</div>
+                        <div class="col-md-9">
+                            <a href="mailto:@Model.Email">@Model.Email</a>
+                        </div>
+                    </div>
+                }
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Created:</div>
+                    <div class="col-md-9">@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss UTC")</div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.Messages?.Any() == true)
+        {
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Recent Messages (@Model.Messages.Count total)</span>
+                    <a href="@Url.Action("UserMessages", "Dashboard", new { userId = Model.Id })" class="btn btn-outline-primary btn-sm">
+                        View All
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Channel</th>
+                                    <th>Message</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var message in Model.Messages.OrderByDescending(m => m.CreatedAt).Take(10))
+                                {
+                                    <tr>
+                                        <td>@message.Id</td>
+                                        <td>
+                                            <span class="badge @(message.Channel == WhatsAppMvcComplete.Models.MessageChannel.WhatsApp ? "bg-success" : "bg-primary")">
+                                                @message.Channel
+                                            </span>
+                                        </td>
+                                        <td style="max-width: 200px;">
+                                            <div class="text-truncate" title="@message.MessageText">
+                                                @message.MessageText
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @{
+                                                var statusBadge = message.Status switch
+                                                {
+                                                    WhatsAppMvcComplete.Models.MessageStatus.Sent => "bg-primary",
+                                                    WhatsAppMvcComplete.Models.MessageStatus.Pending => "bg-warning",
+                                                    WhatsAppMvcComplete.Models.MessageStatus.Delivered => "bg-success",
+                                                    WhatsAppMvcComplete.Models.MessageStatus.Failed => "bg-danger",
+                                                    _ => "bg-secondary"
+                                                };
+                                            }
+                                            <span class="badge @statusBadge">@message.Status</span>
+                                        </td>
+                                        <td>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                Quick Actions
+            </div>
+            <div class="card-body">
+                <a href="/Messages/Compose?userId=@Model.Id" class="btn btn-primary w-100 mb-2">
+                    <i class="bi bi-send"></i> Send SMS
+                </a>
+                <a href="/Messages/Compose?userId=@Model.Id&channel=WhatsApp" class="btn btn-success w-100 mb-2">
+                    <i class="bi bi-whatsapp"></i> Send WhatsApp
+                </a>
+                <a href="@Url.Action("UserMessages", "Dashboard", new { userId = Model.Id })" class="btn btn-outline-info w-100">
+                    <i class="bi bi-journal-text"></i> Message History
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                Statistics
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Total Messages:</span>
+                    <strong>@(Model.Messages?.Count ?? 0)</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Sent:</span>
+                    <strong class="text-primary">@(Model.Messages?.Count(m => m.Status == WhatsAppMvcComplete.Models.MessageStatus.Sent) ?? 0)</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Delivered:</span>
+                    <strong class="text-success">@(Model.Messages?.Count(m => m.Status == WhatsAppMvcComplete.Models.MessageStatus.Delivered) ?? 0)</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Failed:</span>
+                    <strong class="text-danger">@(Model.Messages?.Count(m => m.Status == WhatsAppMvcComplete.Models.MessageStatus.Failed) ?? 0)</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Pending:</span>
+                    <strong class="text-warning">@(Model.Messages?.Count(m => m.Status == WhatsAppMvcComplete.Models.MessageStatus.Pending) ?? 0)</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

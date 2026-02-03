@@ -1,0 +1,167 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.Template>
+
+@{
+    ViewData["Title"] = "Templates";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-file-text"></i> Message Templates</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item active">Templates</li>
+            </ol>
+        </nav>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Create Template
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <a asp-action="Index" class="text-decoration-none">
+            <div class="card text-center h-100 py-3">
+                <div class="card-body">
+                    <h3 class="mb-0">@Model.Count()</h3>
+                    <small class="text-muted">Total Templates</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a asp-action="Index" asp-route-status="Approved" class="text-decoration-none">
+            <div class="card text-center h-100 py-3 border-success">
+                <div class="card-body">
+                    <h3 class="mb-0 text-success">@Model.Count(t => t.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved)</h3>
+                    <small class="text-muted">Approved</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a asp-action="PendingApproval" class="text-decoration-none">
+            <div class="card text-center h-100 py-3 border-warning">
+                <div class="card-body">
+                    <h3 class="mb-0 text-warning">@Model.Count(t => t.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending)</h3>
+                    <small class="text-muted">Pending Approval</small>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small">Status Filter</label>
+                <select name="status" class="form-select">
+                    <option value="">All Templates</option>
+                    <option value="Pending" selected="@(ViewBag.StatusFilter == "Pending")">Pending</option>
+                    <option value="Approved" selected="@(ViewBag.StatusFilter == "Approved")">Approved</option>
+                    <option value="Rejected" selected="@(ViewBag.StatusFilter == "Rejected")">Rejected</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a asp-action="Index" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Templates Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list me-2"></i>All Templates (@Model.Count())</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th><i class="bi bi-hash me-1"></i>ID</th>
+                        <th><i class="bi bi-card-text me-1"></i>Name</th>
+                        <th><i class="bi bi-chat me-1"></i>Channel</th>
+                        <th><i class="bi bi-info-circle me-1"></i>Status</th>
+                        <th><i class="bi bi-person me-1"></i>Created By</th>
+                        <th><i class="bi bi-calendar me-1"></i>Created</th>
+                        <th><i class="bi bi-gear me-1"></i>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var template in Model)
+                    {
+                        <tr>
+                            <td><strong>#@template.Id</strong></td>
+                            <td>@template.Name</td>
+                            <td>
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-whatsapp me-1"></i>@template.Channel
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge @(template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : "bg-warning")">
+                                    @template.Status
+                                </span>
+                            </td>
+                            <td>@(template.CreatedBy ?? "System")</td>
+                            <td><small>@template.CreatedAt.ToString("MMM dd, yyyy")</small></td>
+                            <td>
+                                <a asp-action="Details" asp-route-id="@template.Id" class="btn btn-sm btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                @if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending)
+                                {
+                                    <form asp-action="RequestApproval" asp-route-templateId="@template.Id" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Request Approval">
+                                            <i class="bi bi-send-check"></i>
+                                        </button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-3">No templates found</p>
+                                <a asp-action="Create" class="btn btn-primary">
+                                    <i class="bi bi-plus me-1"></i>Create Your First Template
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

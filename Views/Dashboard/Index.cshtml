@@ -1,0 +1,224 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.Message>
+
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item active">Home</li>
+        </ol>
+    </nav>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-2">
+        <div class="stat-card">
+            <small>Total</small>
+            <h2>@ViewBag.TotalMessages</h2>
+            <small>Messages</small>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card info">
+            <small>Sent</small>
+            <h2>@ViewBag.SentMessages</h2>
+            <small>Delivered</small>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card success">
+            <small>Delivered</small>
+            <h2>@ViewBag.DeliveredMessages</h2>
+            <small>Success</small>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card warning">
+            <small>Pending</small>
+            <h2>@ViewBag.PendingMessages</h2>
+            <small>Scheduled</small>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card danger">
+            <small>Failed</small>
+            <h2>@ViewBag.FailedMessages</h2>
+            <small>Errors</small>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card">
+            <small>Received</small>
+            <h2>@ViewBag.ReceivedMessages</h2>
+            <small>Replies</small>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <a href="/Messages/Compose" class="quick-action-btn text-decoration-none">
+            <i class="bi bi-send text-primary"></i>
+            <span class="small">Send Message</span>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/Templates" class="quick-action-btn text-decoration-none">
+            <i class="bi bi-file-text text-success"></i>
+            <span class="small">Templates</span>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/Conversations" class="quick-action-btn text-decoration-none">
+            <i class="bi bi-chat-dots text-info"></i>
+            <span class="small">Conversations</span>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="/Logs" class="quick-action-btn text-decoration-none">
+            <i class="bi bi-journal-text text-warning"></i>
+            <span class="small">Logs</span>
+        </a>
+    </div>
+</div>
+
+<!-- Filter Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-funnel me-2"></i>Filters
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small">Status</label>
+                <select name="statusFilter" class="form-select">
+                    <option value="">All Statuses</option>
+                    <option value="Pending" selected="@(ViewBag.StatusFilter == "Pending")">Pending</option>
+                    <option value="Sent" selected="@(ViewBag.StatusFilter == "Sent")">Sent</option>
+                    <option value="Delivered" selected="@(ViewBag.StatusFilter == "Delivered")">Delivered</option>
+                    <option value="Failed" selected="@(ViewBag.StatusFilter == "Failed")">Failed</option>
+                    <option value="Received" selected="@(ViewBag.StatusFilter == "Received")">Received</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Channel</label>
+                <select name="channelFilter" class="form-select">
+                    <option value="">All Channels</option>
+                    <option value="SMS" selected="@(ViewBag.ChannelFilter == "SMS")">SMS</option>
+                    <option value="WhatsApp" selected="@(ViewBag.ChannelFilter == "WhatsApp")">WhatsApp</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">From</label>
+                <input type="date" name="fromDate" class="form-control" value="@ViewBag.FromDate">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">To</label>
+                <input type="date" name="toDate" class="form-control" value="@ViewBag.ToDate">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Messages Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list me-2"></i>Recent Messages (@Model.Count())</span>
+        <a href="/Messages/Compose" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus me-1"></i>New Message
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th><i class="bi bi-hash me-1"></i>ID</th>
+                        <th><i class="bi bi-person me-1"></i>User</th>
+                        <th><i class="bi bi-chat me-1"></i>Message</th>
+                        <th><i class="bi bi-broadcast me-1"></i>Channel</th>
+                        <th><i class="bi bi-info-circle me-1"></i>Status</th>
+                        <th><i class="bi bi-calendar me-1"></i>Created</th>
+                        <th><i class="bi bi-gear me-1"></i>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var message in Model)
+                    {
+                        <tr>
+                            <td><strong>#@message.Id</strong></td>
+                            <td>
+                                @if (message.User != null)
+                                {
+                                    <a href="@Url.Action("Details", "Users", new { id = message.User.Id })">@message.User.Name</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Unknown</span>
+                                }
+                            </td>
+                            <td style="max-width: 200px;">
+                                <div class="text-truncate" title="@message.MessageText">@message.MessageText</div>
+                            </td>
+                            <td>
+                                <span class="badge @(message.Channel == WhatsAppMvcComplete.Models.MessageChannel.WhatsApp ? "bg-success" : "bg-primary")">
+                                    @message.Channel
+                                </span>
+                            </td>
+                            <td>
+                                @{
+                                    var badgeClass = message.Status switch
+                                    {
+                                        WhatsAppMvcComplete.Models.MessageStatus.Sent => "bg-primary",
+                                        WhatsAppMvcComplete.Models.MessageStatus.Pending => "bg-warning",
+                                        WhatsAppMvcComplete.Models.MessageStatus.Delivered => "bg-success",
+                                        WhatsAppMvcComplete.Models.MessageStatus.Failed => "bg-danger",
+                                        WhatsAppMvcComplete.Models.MessageStatus.Received => "bg-info",
+                                        _ => "bg-secondary"
+                                    };
+                                }
+                                <span class="badge @badgeClass">@message.Status</span>
+                            </td>
+                            <td><small>@message.CreatedAt.ToString("MMM dd, HH:mm")</small></td>
+                            <td>
+                                <a href="@Url.Action("MessageDetails", new { id = message.Id })" class="btn btn-sm btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                @if (message.Status == WhatsAppMvcComplete.Models.MessageStatus.Failed && message.RetryCount < 3)
+                                {
+                                    <form asp-controller="Messages" asp-action="RetryMessage" method="post" class="d-inline">
+                                        <input type="hidden" name="messageId" value="@message.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Retry">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-3">No messages found</p>
+                                <a href="/Messages/Compose" class="btn btn-primary">Send Your First Message</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,194 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.MessageLog>
+
+@{
+    ViewData["Title"] = "Message Logs";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1><i class="bi bi-journal-text"></i> Message Logs</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item active">Logs</li>
+        </ol>
+    </nav>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-funnel me-2"></i>Filters
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small">Message ID</label>
+                <input type="number" name="messageId" class="form-control" value="@ViewBag.MessageId" placeholder="Enter message ID">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Event Type</label>
+                <select name="eventType" class="form-select">
+                    <option value="">All Events</option>
+                    @foreach (var type in Enum.GetValues<WhatsAppMvcComplete.Models.EventType>())
+                    {
+                        <option value="@type" selected="@(ViewBag.EventType == type.ToString())">@type</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">From Date</label>
+                <input type="date" name="fromDate" class="form-control" value="@ViewBag.FromDate">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">To Date</label>
+                <input type="date" name="toDate" class="form-control" value="@ViewBag.ToDate">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <span class="text-muted">Page @ViewBag.CurrentPage of @ViewBag.TotalPages</span>
+    <div>
+        @if (ViewBag.CurrentPage > 1)
+        {
+            <a asp-action="Index" asp-route-page="@(ViewBag.CurrentPage - 1)" 
+               asp-route-messageId="@ViewBag.MessageId" asp-route-eventType="@ViewBag.EventType"
+               asp-route-fromDate="@ViewBag.FromDate" asp-route-toDate="@ViewBag.ToDate"
+               class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-chevron-left"></i> Previous
+            </a>
+        }
+        @if (ViewBag.CurrentPage < ViewBag.TotalPages)
+        {
+            <a asp-action="Index" asp-route-page="@(ViewBag.CurrentPage + 1)"
+               asp-route-messageId="@ViewBag.MessageId" asp-route-eventType="@ViewBag.EventType"
+               asp-route-fromDate="@ViewBag.FromDate" asp-route-toDate="@ViewBag.ToDate"
+               class="btn btn-outline-primary btn-sm">
+                Next <i class="bi bi-chevron-right"></i>
+            </a>
+        }
+    </div>
+</div>
+
+<!-- Logs Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list me-2"></i>Logs (@Model.Count())</span>
+        <div>
+            <a asp-action="ErrorLogs" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-exclamation-triangle me-1"></i>Error Logs
+            </a>
+            <a asp-action="InboundMessages" class="btn btn-outline-info btn-sm">
+                <i class="bi bi-arrow-down-left me-1"></i>Inbound
+            </a>
+            <a asp-action="WebhookPayloads" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-hdd-network me-1"></i>Webhooks
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th><i class="bi bi-hash me-1"></i>ID</th>
+                        <th><i class="bi bi-envelope me-1"></i>Message ID</th>
+                        <th><i class="bi bi-person me-1"></i>User</th>
+                        <th><i class="bi bi-bell me-1"></i>Event Type</th>
+                        <th><i class="bi bi-clock me-1"></i>Timestamp</th>
+                        <th><i class="bi bi-info-circle me-1"></i>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in Model)
+                    {
+                        <tr>
+                            <td><strong>#@log.Id</strong></td>
+                            <td>
+                                <a asp-controller="Dashboard" asp-action="MessageDetails" asp-route-id="@log.MessageId">
+                                    #@log.MessageId
+                                </a>
+                            </td>
+                            <td>@(log.Message?.User?.Name ?? "N/A")</td>
+                            <td>
+                                <span class="badge @(log.EventType == WhatsAppMvcComplete.Models.EventType.Sent ? "bg-primary" : log.EventType == WhatsAppMvcComplete.Models.EventType.Delivered ? "bg-success" : log.EventType == WhatsAppMvcComplete.Models.EventType.Failed ? "bg-danger" : log.EventType == WhatsAppMvcComplete.Models.EventType.Received ? "bg-warning" : "bg-secondary")">
+                                    @log.EventType
+                                </span>
+                            </td>
+                            <td><small>@log.EventTimestamp.ToString("MMM dd, HH:mm:ss")</small></td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(log.ErrorMessage))
+                                {
+                                    <span class="text-danger" title="@log.ErrorMessage">
+                                        <i class="bi bi-x-circle"></i> Error
+                                    </span>
+                                }
+                                else if (!string.IsNullOrEmpty(log.WebhookPayload))
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="togglePayload(@log.Id)">
+                                        <i class="bi bi-code-slash me-1"></i>View Payload
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                        </tr>
+                        @if (!string.IsNullOrEmpty(log.WebhookPayload))
+                        {
+                            <tr id="payload-@log.Id" style="display: none;">
+                                <td colspan="6">
+                                    <div class="bg-dark text-light p-3 rounded" style="font-family: monospace; font-size: 0.85rem;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted">Webhook Payload:</span>
+                                            <button class="btn btn-sm btn-outline-light" onclick="copyPayload(@log.Id)">
+                                                <i class="bi bi-clipboard"></i> Copy
+                                            </button>
+                                        </div>
+                                        <pre class="mb-0" id="payload-content-@log.Id">@log.WebhookPayload</pre>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-3">No logs found</p>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function togglePayload(id) {
+            const row = document.getElementById('payload-' + id);
+            if (row) {
+                row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+            }
+        }
+
+        function copyPayload(id) {
+            const content = document.getElementById('payload-content-' + id).textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                alert('Payload copied to clipboard!');
+            });
+        }
+    </script>
+}

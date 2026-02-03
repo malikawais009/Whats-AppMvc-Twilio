@@ -2,7 +2,7 @@ namespace WhatsAppMvcComplete.Models;
 
 public class TwilioSettings
 {
-    public string AccountSid { get; set; }
-    public string AuthToken { get; set; }
-    public string WhatsAppFrom { get; set; }
+    public required string AccountSid { get; set; }
+    public required string AuthToken { get; set; }
+    public required string WhatsAppFrom { get; set; }
 }

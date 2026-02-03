@@ -1,0 +1,149 @@
+@model WhatsAppMvcComplete.Models.Template
+
+@{
+    ViewData["Title"] = $"Template: {Model.Name}";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>Template: @Model.Name</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Templates">Templates</a></li>
+            <li class="breadcrumb-item active">@Model.Name</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Template Details</span>
+                <span class="badge @(Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : "bg-warning")">
+                    @Model.Status
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">ID:</div>
+                    <div class="col-md-9">@Model.Id</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Name:</div>
+                    <div class="col-md-9">@Model.Name</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Channel:</div>
+                    <div class="col-md-9">@Model.Channel</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Created:</div>
+                    <div class="col-md-9">@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Created By:</div>
+                    <div class="col-md-9">@Model.CreatedBy</div>
+                </div>
+                @if (Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Rejection Reason:</div>
+                        <div class="col-md-9 text-danger">@Model.RejectionReason</div>
+                    </div>
+                }
+                
+                <div class="mt-4">
+                    <label class="form-label fw-bold">Template Text:</label>
+                    <div class="p-3 bg-light border rounded">
+                        @Model.TemplateText
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (ViewBag.Requests != null && ((List<WhatsAppMvcComplete.Models.TemplateRequest>)ViewBag.Requests).Any())
+        {
+            <div class="card">
+                <div class="card-header">Approval Requests</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Requested By</th>
+                                <th>Requested At</th>
+                                <th>Status</th>
+                                <th>Approved By</th>
+                                <th>Comments</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var request in (List<WhatsAppMvcComplete.Models.TemplateRequest>)ViewBag.Requests)
+                            {
+                                <tr>
+                                    <td>@request.RequestedBy</td>
+                                    <td>@request.RequestedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td>
+                                        <span class="badge @(request.Status == WhatsAppMvcComplete.Models.RequestStatus.Approved ? "bg-success" : request.Status == WhatsAppMvcComplete.Models.RequestStatus.Rejected ? "bg-danger" : "bg-warning")">
+                                            @request.Status
+                                        </span>
+                                    </td>
+                                    <td>@(request.ApprovedBy ?? "-")</td>
+                                    <td>@request.Comments</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">Actions</div>
+            <div class="card-body">
+                @if (Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending)
+                {
+                    <form asp-action="RequestApproval" asp-route-templateId="@Model.Id" method="post">
+                        <button type="submit" class="btn btn-primary w-100 mb-2">Request Approval</button>
+                    </form>
+                    <a asp-action="PendingApproval" class="btn btn-outline-secondary w-100">View Pending Approvals</a>
+                }
+                else if (Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved)
+                {
+                    <a asp-controller="Messages" asp-action="Compose" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-send"></i> Use This Template
+                    </a>
+                }
+                else if (Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected)
+                {
+                    <a asp-action="Create" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-plus"></i> Create New Version
+                    </a>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Usage Statistics</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Messages Sent:</span>
+                    <strong>@Model.Messages.Count</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Success Rate:</span>
+                    <strong>
+                        @{
+                            var delivered = Model.Messages.Count(m => m.Status == WhatsAppMvcComplete.Models.MessageStatus.Delivered);
+                            var rate = Model.Messages.Any() ? (delivered * 100.0 / Model.Messages.Count).ToString("F1") : "0";
+                        }
+                        @rate%
+                    </strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

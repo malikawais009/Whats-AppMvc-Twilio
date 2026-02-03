@@ -1,0 +1,101 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.Message>
+
+@{
+    ViewData["Title"] = "Scheduled Messages";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>Scheduled Messages</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Messages/Compose">Compose</a></li>
+            <li class="breadcrumb-item active">Scheduled</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock text-warning"></i> Pending Scheduled Messages</span>
+        <a href="/Messages/Compose" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus"></i> New Message
+        </a>
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-calendar-check fs-1 text-success"></i>
+                <p class="mt-2">No scheduled messages pending.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Message</th>
+                            <th>Channel</th>
+                            <th>Scheduled For</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var message in Model)
+                        {
+                            <tr>
+                                <td>@message.Id</td>
+                                <td>
+                                    @if (message.User != null)
+                                    {
+                                        <a href="@Url.Action("Details", "Users", new { id = message.User.Id })">
+                                            @message.User.Name
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Unknown</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 250px;" title="@message.MessageText">
+                                        @message.MessageText
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge @(message.Channel == WhatsAppMvcComplete.Models.MessageChannel.WhatsApp ? "bg-success" : "bg-primary")">
+                                        @message.Channel
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (message.ScheduledAt.HasValue)
+                                    {
+                                        <span class="@(message.ScheduledAt <= DateTime.UtcNow ? "text-success fw-bold" : "")">
+                                            @message.ScheduledAt.Value.ToString("yyyy-MM-dd HH:mm")
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>
+                                    <a href="@Url.Action("Details", "Dashboard", new { id = message.Id })" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,107 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.Message>
+
+@{
+    ViewData["Title"] = "Retry Attempts";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>Retry Attempts</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Logs">Logs</a></li>
+            <li class="breadcrumb-item active">Retries</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-arrow-repeat text-primary"></i> Messages with Retry Attempts</span>
+        <a href="@Url.Action("Index", "Logs")" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Logs
+        </a>
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-check-circle fs-1 text-success"></i>
+                <p class="mt-2">No retry attempts found.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Message</th>
+                            <th>Channel</th>
+                            <th>Status</th>
+                            <th>Retry Count</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var message in Model)
+                        {
+                            <tr>
+                                <td>@message.Id</td>
+                                <td>
+                                    @if (message.User != null)
+                                    {
+                                        <a href="@Url.Action("Details", "Users", new { id = message.User.Id })">
+                                            @message.User.Name
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Unknown</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 250px;" title="@message.MessageText">
+                                        @message.MessageText
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge @(message.Channel == WhatsAppMvcComplete.Models.MessageChannel.WhatsApp ? "bg-success" : "bg-primary")">
+                                        @message.Channel
+                                    </span>
+                                </td>
+                                <td>
+                                    @{
+                                        var statusBadge = message.Status switch
+                                        {
+                                            WhatsAppMvcComplete.Models.MessageStatus.Sent => "bg-primary",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Pending => "bg-warning",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Delivered => "bg-success",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Failed => "bg-danger",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Received => "bg-info",
+                                            _ => "bg-secondary"
+                                        };
+                                    }
+                                    <span class="badge @statusBadge">@message.Status</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning text-dark">@message.RetryCount retries</span>
+                                </td>
+                                <td>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>
+                                    <a href="@Url.Action("MessageLogs", "Logs", new { messageId = message.Id })" class="btn btn-sm btn-outline-info">
+                                        <i class="bi bi-journal-text"></i> Logs
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,105 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.Message>
+
+@{
+    ViewData["Title"] = $"Messages - {ViewBag.User?.Name}";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>Messages for @ViewBag.User?.Name</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Users">Users</a></li>
+            <li class="breadcrumb-item"><a href="@Url.Action("Details", "Users", new { id = ViewBag.User?.Id })">@ViewBag.User?.Name</a></li>
+            <li class="breadcrumb-item active">Messages</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Message History</span>
+        <a href="@Url.Action("Details", "Users", new { id = ViewBag.User?.Id })" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to User
+        </a>
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-inbox fs-1"></i>
+                <p class="mt-2">No messages found for this user.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Channel</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Twilio SID</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var message in Model)
+                        {
+                            <tr>
+                                <td>@message.Id</td>
+                                <td>
+                                    <span class="badge @(message.Channel == WhatsAppMvcComplete.Models.MessageChannel.WhatsApp ? "bg-success" : "bg-primary")">
+                                        @message.Channel
+                                    </span>
+                                </td>
+                                <td style="max-width: 300px;">
+                                    <div class="text-truncate" title="@message.MessageText">
+                                        @message.MessageText
+                                    </div>
+                                </td>
+                                <td>
+                                    @{
+                                        var statusBadge = message.Status switch
+                                        {
+                                            WhatsAppMvcComplete.Models.MessageStatus.Sent => "bg-primary",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Pending => "bg-warning",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Delivered => "bg-success",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Failed => "bg-danger",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Received => "bg-info",
+                                            WhatsAppMvcComplete.Models.MessageStatus.Read => "bg-dark",
+                                            _ => "bg-secondary"
+                                        };
+                                    }
+                                    <span class="badge @statusBadge">@message.Status</span>
+                                </td>
+                                <td>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(message.TwilioMessageId))
+                                    {
+                                        <span class="text-muted small" title="@message.TwilioMessageId">
+                                            @message.TwilioMessageId.Substring(0, Math.Min(15, message.TwilioMessageId.Length))...
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    <a href="@Url.Action("MessageLogs", "Logs", new { messageId = message.Id })" class="btn btn-sm btn-outline-info">
+                                        <i class="bi bi-journal-text"></i> Logs
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

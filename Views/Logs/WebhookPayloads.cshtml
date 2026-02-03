@@ -1,0 +1,121 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.MessageLog>
+
+@{
+    ViewData["Title"] = "Webhook Payloads";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>Webhook Payloads</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Logs">Logs</a></li>
+            <li class="breadcrumb-item active">Webhook Payloads</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-hdd-network text-info"></i> Twilio Webhook Payloads</span>
+        <a href="@Url.Action("Index", "Logs")" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Logs
+        </a>
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-inbox fs-1"></i>
+                <p class="mt-2">No webhook payloads found.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Message ID</th>
+                            <th>Event Type</th>
+                            <th>Timestamp</th>
+                            <th>Payload</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in Model)
+                        {
+                            <tr>
+                                <td>@log.Id</td>
+                                <td>
+                                    <a href="@Url.Action("MessageLogs", "Logs", new { messageId = log.MessageId })">
+                                        #@log.MessageId
+                                    </a>
+                                </td>
+                                <td>
+                                    @{
+                                        var badgeClass = log.EventType switch
+                                        {
+                                            WhatsAppMvcComplete.Models.EventType.Sent => "bg-primary",
+                                            WhatsAppMvcComplete.Models.EventType.Delivered => "bg-success",
+                                            WhatsAppMvcComplete.Models.EventType.Read => "bg-info",
+                                            WhatsAppMvcComplete.Models.EventType.Failed => "bg-danger",
+                                            WhatsAppMvcComplete.Models.EventType.Received => "bg-warning",
+                                            WhatsAppMvcComplete.Models.EventType.Queued => "bg-secondary",
+                                            _ => "bg-secondary"
+                                        };
+                                    }
+                                    <span class="badge @badgeClass">@log.EventType</span>
+                                </td>
+                                <td>@log.EventTimestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td style="max-width: 400px;">
+                                    @if (!string.IsNullOrEmpty(log.WebhookPayload))
+                                    {
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="togglePayload(this, @log.Id)">
+                                            <i class="bi bi-eye"></i> View Payload
+                                        </button>
+                                        <div id="payload-@log.Id" class="payload-content d-none mt-2">
+                                            <pre class="bg-light p-2 rounded small" style="max-height: 200px; overflow-y: auto;">@log.WebhookPayload</pre>
+                                            <button class="btn btn-sm btn-outline-primary mt-1" onclick="copyPayload(@log.Id)">
+                                                <i class="bi bi-clipboard"></i> Copy
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function togglePayload(btn, id) {
+            var payloadDiv = document.getElementById('payload-' + id);
+            if (payloadDiv.classList.contains('d-none')) {
+                payloadDiv.classList.remove('d-none');
+                btn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide Payload';
+            } else {
+                payloadDiv.classList.add('d-none');
+                btn.innerHTML = '<i class="bi bi-eye"></i> View Payload';
+            }
+        }
+
+        function copyPayload(id) {
+            var payloadDiv = document.getElementById('payload-' + id);
+            var pre = payloadDiv.querySelector('pre');
+            navigator.clipboard.writeText(pre.textContent).then(function() {
+                alert('Payload copied to clipboard!');
+            });
+        }
+    </script>
+}

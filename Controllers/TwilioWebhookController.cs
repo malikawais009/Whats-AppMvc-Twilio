@@ -61,6 +61,7 @@ public class TwilioWebhookController : ControllerBase
             .Group($"conversation-{convo.Id}")
             .SendAsync("ReceiveMessage", new
             {
+                conversationId = convo.Id,
                 body = msg.Body,
                 inbound = true,
                 time = msg.CreatedAt.ToString("HH:mm")

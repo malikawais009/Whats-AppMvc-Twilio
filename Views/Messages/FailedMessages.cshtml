@@ -1,0 +1,132 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.Message>
+
+@{
+    ViewData["Title"] = "Failed Messages";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>Failed Messages</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Messages/Compose">Compose</a></li>
+            <li class="breadcrumb-item active">Failed</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-x-circle text-danger"></i> Failed Messages (Retry Available)</span>
+        <a href="/Messages/Compose" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus"></i> New Message
+        </a>
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-check-circle fs-1 text-success"></i>
+                <p class="mt-2">No failed messages found!</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Message</th>
+                            <th>Channel</th>
+                            <th>Retry Count</th>
+                            <th>Created</th>
+                            <th>Error</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var message in Model)
+                        {
+                            <tr class="table-danger">
+                                <td>@message.Id</td>
+                                <td>
+                                    @if (message.User != null)
+                                    {
+                                        <a href="@Url.Action("Details", "Users", new { id = message.User.Id })">
+                                            @message.User.Name
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Unknown</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 200px;" title="@message.MessageText">
+                                        @message.MessageText
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge @(message.Channel == WhatsAppMvcComplete.Models.MessageChannel.WhatsApp ? "bg-success" : "bg-primary")">
+                                        @message.Channel
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (message.RetryCount >= 3)
+                                    {
+                                        <span class="badge bg-danger">Max retries (@message.RetryCount)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">@message.RetryCount / 3</span>
+                                    }
+                                </td>
+                                <td>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td style="max-width: 200px;">
+                                    @{
+                                        var lastError = message.Logs?
+                                            .Where(l => l.EventType == WhatsAppMvcComplete.Models.EventType.Failed)
+                                            .OrderByDescending(l => l.EventTimestamp)
+                                            .FirstOrDefault();
+                                    }
+                                    @if (lastError != null)
+                                    {
+                                        <span class="text-danger small" title="@lastError.ErrorMessage">
+                                            @(lastError.ErrorMessage?.Length > 50 ? lastError.ErrorMessage.Substring(0, 50) + "..." : lastError.ErrorMessage)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (message.RetryCount < 3)
+                                    {
+                                        <form asp-controller="Messages" asp-action="RetryMessage" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="messageId" value="@message.Id" />
+                                            <button type="submit" class="btn btn-sm btn-warning">
+                                                <i class="bi bi-arrow-repeat"></i> Retry
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">Max retries reached</span>
+                                    }
+                                    <a href="@Url.Action("Details", "Dashboard", new { id = message.Id })" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

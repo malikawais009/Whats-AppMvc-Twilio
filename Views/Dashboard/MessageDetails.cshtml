@@ -1,0 +1,252 @@
+@model WhatsAppMvcComplete.Models.Message
+
+@{
+    ViewData["Title"] = $"Message #{Model.Id} Details";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1>Message Details</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item active">Message #@Model.Id</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                Message Information
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">ID:</div>
+                    <div class="col-md-9">@Model.Id</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Channel:</div>
+                    <div class="col-md-9">
+                        <span class="badge @(Model.Channel == WhatsAppMvcComplete.Models.MessageChannel.WhatsApp ? "bg-success" : "bg-primary")">
+                            @Model.Channel
+                        </span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Status:</div>
+                    <div class="col-md-9">
+                        @{
+                            var statusBadge = Model.Status switch
+                            {
+                                WhatsAppMvcComplete.Models.MessageStatus.Sent => "bg-primary",
+                                WhatsAppMvcComplete.Models.MessageStatus.Pending => "bg-warning",
+                                WhatsAppMvcComplete.Models.MessageStatus.Delivered => "bg-success",
+                                WhatsAppMvcComplete.Models.MessageStatus.Failed => "bg-danger",
+                                WhatsAppMvcComplete.Models.MessageStatus.Received => "bg-info",
+                                WhatsAppMvcComplete.Models.MessageStatus.Read => "bg-dark",
+                                _ => "bg-secondary"
+                            };
+                        }
+                        <span class="badge @statusBadge">@Model.Status</span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Message:</div>
+                    <div class="col-md-9">@Model.MessageText</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Twilio SID:</div>
+                    <div class="col-md-9">
+                        @if (!string.IsNullOrEmpty(Model.TwilioMessageId))
+                        {
+                            <span class="text-muted">@Model.TwilioMessageId</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">-</span>
+                        }
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Scheduled At:</div>
+                    <div class="col-md-9">
+                        @if (Model.ScheduledAt.HasValue)
+                        {
+                            @Model.ScheduledAt.Value.ToString("yyyy-MM-dd HH:mm:ss UTC")
+                        }
+                        else
+                        {
+                            <span class="text-muted">Not scheduled</span>
+                        }
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Created:</div>
+                    <div class="col-md-9">@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss UTC")</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Retry Count:</div>
+                    <div class="col-md-9">@Model.RetryCount / 3</div>
+                </div>
+                @if (Model.RetryCount > 0)
+                {
+                    <div class="row">
+                        <div class="col-md-3 fw-bold">Last Retry:</div>
+                        <div class="col-md-9">
+                            @if (Model.ScheduledAt.HasValue)
+                            {
+                                @Model.ScheduledAt.Value.ToString("yyyy-MM-dd HH:mm:ss UTC")
+                            }
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model.Logs?.Any() == true)
+        {
+            <div class="card">
+                <div class="card-header">
+                    Message Logs
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Event Type</th>
+                                    <th>Timestamp</th>
+                                    <th>Error/Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var log in Model.Logs.OrderByDescending(l => l.EventTimestamp))
+                                {
+                                    <tr class="@(log.EventType == WhatsAppMvcComplete.Models.EventType.Failed ? "table-danger" : "")">
+                                        <td>@log.Id</td>
+                                        <td>
+                                            @{
+                                                var logBadge = log.EventType switch
+                                                {
+                                                    WhatsAppMvcComplete.Models.EventType.Sent => "bg-primary",
+                                                    WhatsAppMvcComplete.Models.EventType.Delivered => "bg-success",
+                                                    WhatsAppMvcComplete.Models.EventType.Read => "bg-info",
+                                                    WhatsAppMvcComplete.Models.EventType.Failed => "bg-danger",
+                                                    WhatsAppMvcComplete.Models.EventType.Received => "bg-warning",
+                                                    _ => "bg-secondary"
+                                                };
+                                            }
+                                            <span class="badge @logBadge">@log.EventType</span>
+                                        </td>
+                                        <td>@log.EventTimestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(log.ErrorMessage))
+                                            {
+                                                <span class="text-danger">@log.ErrorMessage</span>
+                                            }
+                                            else if (!string.IsNullOrEmpty(log.WebhookPayload))
+                                            {
+                                                <span class="text-muted small">Webhook received</span>
+                                            }
+                                            else
+                                            {
+                                                <span>-</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-md-4">
+        @if (Model.User != null)
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    User Information
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="fw-bold">Name:</div>
+                        <div><a href="@Url.Action("Details", "Users", new { id = Model.User.Id })">@Model.User.Name</a></div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="fw-bold">Phone:</div>
+                        <div>@Model.User.Phone</div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Model.User.WhatsAppNumber))
+                    {
+                        <div class="mb-3">
+                            <div class="fw-bold">WhatsApp:</div>
+                            <div>@Model.User.WhatsAppNumber</div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.User.Email))
+                    {
+                        <div class="mb-3">
+                            <div class="fw-bold">Email:</div>
+                            <div>@Model.User.Email</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Model.Template != null)
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    Template Information
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="fw-bold">Name:</div>
+                        <div><a href="@Url.Action("Details", "Templates", new { id = Model.Template.Id })">@Model.Template.Name</a></div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="fw-bold">Status:</div>
+                        <div>
+                            <span class="badge @(Model.Template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : Model.Template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : "bg-warning")">
+                                @Model.Template.Status
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-header">
+                Actions
+            </div>
+            <div class="card-body">
+                @if (Model.Status == WhatsAppMvcComplete.Models.MessageStatus.Failed && Model.RetryCount < 3)
+                {
+                    <form asp-controller="Messages" asp-action="RetryMessage" method="post" class="mb-2">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="messageId" value="@Model.Id" />
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="bi bi-arrow-repeat"></i> Retry Message
+                        </button>
+                    </form>
+                }
+                <a href="@Url.Action("MessageLogs", "Logs", new { messageId = Model.Id })" class="btn btn-outline-info w-100">
+                    <i class="bi bi-journal-text"></i> View All Logs
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
