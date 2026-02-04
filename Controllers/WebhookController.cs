@@ -75,11 +75,14 @@ public class WebhookController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
+        // Find user by phone number
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Phone == from || u.WhatsAppNumber == from);
+
         // Store inbound message
         var message = new Message
         {
             ConversationId = conversation.Id,
-            UserId = null, // Will be mapped if user exists
+            UserId = user?.Id, // Set UserId if user found
             Channel = MessageChannel.WhatsApp,
             MessageText = body,
             Status = MessageStatus.Received,

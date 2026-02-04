@@ -76,6 +76,7 @@ public class LogsController : Controller
     public async Task<IActionResult> InboundMessages()
     {
         var messages = await _db.Messages
+            .Include(m => m.User)
             .Include(m => m.Logs)
             .Where(m => m.Status == Models.MessageStatus.Received)
             .OrderByDescending(m => m.CreatedAt)
