@@ -85,7 +85,8 @@ public class WebhookController : ControllerBase
             Status = MessageStatus.Received,
             TwilioMessageId = messageSid,
             CreatedAt = DateTime.UtcNow,
-            RetryCount = 0
+            RetryCount = 0,
+            IsInbound = true
         };
 
         _db.Messages.Add(message);
