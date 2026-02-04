@@ -7,362 +7,137 @@
 
 <div class="page-header">
     <h1><i class="bi bi-chat-dots text-success"></i> Chat with @Model.PhoneNumber</h1>
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="/Conversations">Conversations</a></li>
-            <li class="breadcrumb-item active">@Model.PhoneNumber</li>
-        </ol>
-    </nav>
 </div>
 
 <div class="row">
-    <!-- Chat Area -->
     <div class="col-md-8">
         <div class="card chat-card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-whatsapp text-success fs-4 me-2"></i>
-                    <div>
-                        <strong>@Model.PhoneNumber</strong>
-                        <br>
-                        <small class="text-muted">@Model.Messages.Count messages</small>
-                    </div>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <span id="chatStatus" class="badge bg-secondary">Connecting...</span>
-                </div>
+                <strong>@Model.PhoneNumber</strong>
+                <span id="chatStatus" class="badge bg-secondary">Connecting…</span>
             </div>
-            
-            <!-- Messages Area -->
-            <div class="card-body" id="chatMessages" style="height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-                @if (!Model.Messages.Any())
+
+            <div id="chatMessages" class="card-body chat-messages" style="height:400px;overflow-y:auto;">
+                @foreach (var message in Model.Messages.OrderBy(m => m.CreatedAt))
                 {
-                    <div class="text-center text-muted py-5">
-                        <i class="bi bi-chat-square-text fs-1"></i>
-                        <p class="mt-2">No messages yet. Start the conversation!</p>
-                    </div>
-                }
-                else
-                {
-                    foreach (var message in Model.Messages.OrderBy(m => m.CreatedAt))
-                    {
-                        <div class="message-container @(message.IsInbound ? "incoming" : "outgoing")">
-                            <div class="message-bubble @(message.IsInbound ? "incoming" : "outgoing")">
-                                <div class="message-text">@message.MessageText</div>
-                                <div class="message-time @(message.IsInbound ? "text-muted" : "text-light")">
-                                    @message.CreatedAt.ToString("HH:mm")
-                                    @if (!message.IsInbound && message.Status == WhatsAppMvcComplete.Models.MessageStatus.Delivered)
-                                    {
-                                        <i class="bi bi-check2-all ms-1"></i>
-                                    }
-                                </div>
-                            </div>
+                    <div class="message-container @(message.IsInbound ? "incoming" : "outgoing")">
+                        <div class="message-bubble @(message.IsInbound ? "incoming" : "outgoing")">
+                            <div>@message.MessageText</div>
+                            <small>@message.CreatedAt.ToString("HH:mm")</small>
                         </div>
-                    }
+                    </div>
                 }
             </div>
-            
-            <!-- Message Input -->
+
             <div class="card-footer">
-                <form asp-controller="Conversations" asp-action="SendReply" method="post" class="d-flex gap-2">
+                <form asp-action="SendReply" method="post" class="d-flex gap-2">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="conversationId" value="@Model.Id" />
                     <input type="hidden" name="phoneNumber" value="@Model.PhoneNumber" />
-                    <div class="flex-grow-1">
-                        <input type="text" name="messageText" class="form-control" 
-                               placeholder="Type a message..." required 
-                               id="messageInput" autocomplete="off">
-                    </div>
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-send"></i>
-                    </button>
+                    <input id="messageInput" name="messageText" class="form-control" required />
+                    <button class="btn btn-success">Send</button>
                 </form>
             </div>
         </div>
     </div>
-    
-    <!-- Sidebar -->
-    <div class="col-md-4">
-        <!-- Quick Reply Templates -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <i class="bi bi-lightning me-2"></i>Quick Replies
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-outline-secondary btn-sm quick-reply-btn" 
-                            onclick="insertQuickReply('Hello! How can I help you today?')">
-                        Hello! How can I help you?
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm quick-reply-btn"
-                            onclick="insertQuickReply('Thank you for your message. We will respond shortly.')">
-                        Thank you message
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm quick-reply-btn"
-                            onclick="insertQuickReply('Your order has been confirmed. Order #{{order_number}}')">
-                        Order confirmation
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Contact Info -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <i class="bi bi-info-circle me-2"></i>Contact Info
-            </div>
-            <div class="card-body">
-                <div class="mb-2">
-                    <i class="bi bi-phone me-2 text-muted"></i>
-                    <strong>@Model.PhoneNumber</strong>
-                </div>
-                <div class="mb-2">
-                    <i class="bi bi-clock me-2 text-muted"></i>
-                    <span>Last: @Model.LastMessageAt.ToString("yyyy-MM-dd HH:mm")</span>
-                </div>
-                <div>
-                    <i class="bi bi-chat me-2 text-muted"></i>
-                    <span>@Model.Messages.Count messages</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Actions -->
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-gear me-2"></i>Actions
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="/Messages/Compose?userId=0" class="btn btn-primary">
-                        <i class="bi bi-send me-2"></i>Send New Message
-                    </a>
-                    <a href="/Logs/InboundMessages" class="btn btn-outline-info">
-                        <i class="bi bi-arrow-down-left me-2"></i>View Inbound
-                    </a>
-                    <a href="/Conversations" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left me-2"></i>Back
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
+
+@section Scripts {
+    <script>
+        console.log("🔥 CHAT SCRIPT LOADED");
+
+        const conversationId = @Model.Id;
+        const chatMessages = document.getElementById("chatMessages");
+        const chatStatus = document.getElementById("chatStatus");
+
+        function addMessage(text, inbound, time) {
+            const div = document.createElement("div");
+            div.className = `message-container ${inbound ? "incoming" : "outgoing"}`;
+            div.innerHTML = `
+                <div class="message-bubble ${inbound ? "incoming" : "outgoing"}">
+                    <div>${text}</div>
+                    <small>${time}</small>
+                </div>`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function initChatSignalR() {
+            if (!window.signalRConnection) {
+                console.warn("⏳ SignalR not ready yet");
+                return;
+            }
+
+            try {
+                await signalRConnection.invoke("JoinConversation", conversationId);
+                console.log("👥 Joined conversation", conversationId);
+
+                chatStatus.className = "badge bg-success";
+                chatStatus.textContent = "Live";
+
+                signalRConnection.off("ReceiveMessage");
+                signalRConnection.on("ReceiveMessage", data => {
+                    console.log("📩 Message received", data);
+
+                    if (data.conversationId === conversationId) {
+                        addMessage(data.body, data.inbound, data.time);
+                    }
+                });
+
+            } catch (err) {
+                console.error("❌ JoinConversation failed", err);
+                chatStatus.className = "badge bg-danger";
+                chatStatus.textContent = "Error";
+            }
+        }
+
+        // CASE 1: SignalR already connected
+        if (window.signalRConnection?.state === "Connected") {
+            console.log("⚡ SignalR already connected");
+            initChatSignalR();
+        }
+
+        // CASE 2: SignalR connects later
+        window.addEventListener("signalRReady", () => {
+            console.log("🟢 signalRReady received");
+            initChatSignalR();
+        });
+    </script>
 
 <style>
     .chat-card {
         border-radius: 12px;
-        overflow: hidden;
     }
-    
+
     .chat-messages {
         display: flex;
         flex-direction: column;
         gap: 8px;
     }
-    
-    .message-container {
-        display: flex;
-        width: 100%;
-    }
-    
+
     .message-container.incoming {
         justify-content: flex-start;
+        display: flex;
     }
-    
+
     .message-container.outgoing {
         justify-content: flex-end;
-    }
-    
-    .message-bubble {
-        max-width: 70%;
-        padding: 10px 14px;
-        border-radius: 12px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        position: relative;
-    }
-    
-    .message-bubble.incoming {
-        background-color: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-bottom-left-radius: 2px;
-    }
-    
-    .message-bubble.outgoing {
-        background-color: #25D366;
-        color: white;
-        border-bottom-right-radius: 2px;
-    }
-    
-    .message-text {
-        margin-bottom: 4px;
-        word-wrap: break-word;
-        line-height: 1.4;
-    }
-    
-    .message-time {
-        font-size: 0.7rem;
-        text-align: right;
         display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 4px;
     }
-    
-    .message-bubble.incoming .message-time {
-        color: #6c757d;
-    }
-    
-    .message-bubble.outgoing .message-time {
-        color: rgba(255,255,255,0.8);
-    }
-    
-    .quick-reply-btn {
-        text-align: left;
-        white-space: normal;
-        height: auto;
-        padding: 8px 12px;
-    }
-    
-    #chatMessages::-webkit-scrollbar {
-        width: 6px;
-    }
-    
-    #chatMessages::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-    
-    #chatMessages::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
-        border-radius: 3px;
-    }
-</style>
 
-@section Scripts {
-    <script>
-        const conversationId = @Model.Id;
-        const currentPhoneNumber = "@Model.PhoneNumber";
-        let chatMessages = null;
-        let messageHandlerAttached = false;
-        
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            chatMessages = document.getElementById('chatMessages');
-            
-            // Scroll to bottom
-            if (chatMessages) {
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-            
-            // Listen for SignalR messages via custom event
-            window.addEventListener('signalRMessage', handleSignalRMessage);
-            
-            // Try to join conversation if SignalR is already connected
-            if (signalRConnection && signalRConnection.state === 'Connected') {
-                joinConversation();
-            } else {
-                // Wait for connection
-                const checkInterval = setInterval(() => {
-                    if (signalRConnection && signalRConnection.state === 'Connected') {
-                        clearInterval(checkInterval);
-                        joinConversation();
-                    }
-                }, 200);
-                
-                // Stop checking after 15 seconds
-                setTimeout(() => clearInterval(checkInterval), 15000);
-            }
-        });
-        
-        async function joinConversation() {
-            try {
-                await signalRConnection.invoke("JoinConversation", conversationId);
-                console.log("Joined conversation group:", conversationId);
-                
-                // Update status badge
-                const statusBadge = document.getElementById('chatStatus');
-                if (statusBadge) {
-                    statusBadge.className = 'badge bg-success';
-                    statusBadge.textContent = 'Live';
-                }
-                
-                // Now attach the message handler
-                attachMessageHandler();
-            } catch (err) {
-                console.error("Failed to join conversation:", err);
-                const statusBadge = document.getElementById('chatStatus');
-                if (statusBadge) {
-                    statusBadge.className = 'badge bg-danger';
-                    statusBadge.textContent = 'Error';
-                }
-            }
+    .message-bubble {
+        padding: 10px;
+        border-radius: 10px;
+        max-width: 70%;
+    }
+
+        .message-bubble.incoming {
+            background: #f1f1f1;
         }
-        
-        function attachMessageHandler() {
-            if (messageHandlerAttached) return;
-            
-            signalRConnection.off("ReceiveMessage");
-            signalRConnection.on("ReceiveMessage", function(data) {
-                console.log("SignalR message received:", data);
-                
-                // Check if message belongs to this conversation
-                // Either by conversationId match or phone number match
-                if (data && (data.conversationId == conversationId || !data.conversationId)) {
-                    addMessageToChat(data.body, data.inbound, data.time);
-                }
-            });
-            
-            messageHandlerAttached = true;
-            console.log("Message handler attached");
+
+        .message-bubble.outgoing {
+            background: #25D366;
+            color: white;
         }
-        
-        function handleSignalRMessage(event) {
-            const data = event.detail;
-            console.log("Custom event received:", data);
-            
-            if (data && (data.conversationId == conversationId || !data.conversationId)) {
-                addMessageToChat(data.body, data.inbound, data.time);
-            }
-        }
-        
-        function addMessageToChat(text, isInbound, time) {
-            if (!chatMessages || !text) return;
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message-container ${isInbound ? 'incoming' : 'outgoing'}`;
-            messageDiv.innerHTML = `
-                <div class="message-bubble ${isInbound ? 'incoming' : 'outgoing'}">
-                    <div class="message-text">${escapeHtml(text)}</div>
-                    <div class="message-time ${isInbound ? 'text-muted' : 'text-light'}">
-                        ${time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                        ${!isInbound ? '<i class="bi bi-check2-all ms-1"></i>' : ''}
-                    </div>
-                </div>
-            `;
-            
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            // Visual feedback
-            messageDiv.style.animation = 'fadeIn 0.3s ease';
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text || '';
-            return div.innerHTML;
-        }
-        
-        function insertQuickReply(text) {
-            document.getElementById('messageInput').value = text;
-            document.getElementById('messageInput').focus();
-        }
-    </script>
-    <style>
-        @@keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+</style>
 }

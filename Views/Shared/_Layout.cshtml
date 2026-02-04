@@ -297,89 +297,97 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script>
-        // Global SignalR connection
-        let signalRConnection = null;
-        
+        // 🔥 SINGLE SOURCE OF TRUTH (GLOBAL)
+        window.signalRConnection = null;
+
         function initGlobalSignalR() {
-            if (signalRConnection) return;
-            
-            const hubConnection = new signalR.HubConnectionBuilder()
+            // Prevent double connection
+            if (window.signalRConnection) return;
+
+            const connection = new signalR.HubConnectionBuilder()
                 .withUrl("/chatHub")
                 .withAutomaticReconnect([0, 1000, 2000, 5000, 10000])
                 .configureLogging(signalR.LogLevel.Warning)
                 .build();
-            
-            // Register message handler BEFORE starting connection
-            hubConnection.on("ReceiveMessage", function(data) {
-                console.log("SignalR message received:", data);
-                // Dispatch custom event for page handlers
-                window.dispatchEvent(new CustomEvent('signalRMessage', { detail: data }));
+
+            // Global receive handler
+            connection.on("ReceiveMessage", data => {
+                console.log("📩 SignalR message received:", data);
+                window.dispatchEvent(
+                    new CustomEvent("signalRMessage", { detail: data })
+                );
             });
-            
-            hubConnection.onreconnecting(() => {
-                console.log("SignalR reconnecting...");
-                updateConnectionStatus('reconnecting');
+
+            connection.onreconnecting(() => {
+                console.log("🔄 SignalR reconnecting...");
+                updateConnectionStatus("reconnecting");
             });
-            
-            hubConnection.onreconnected(() => {
-                console.log("SignalR reconnected, connectionId:", hubConnection.connectionId);
-                updateConnectionStatus('connected');
+
+            connection.onreconnected(() => {
+                console.log("✅ SignalR reconnected:", connection.connectionId);
+                updateConnectionStatus("connected");
+
+                // notify pages again after reconnect
+                window.dispatchEvent(new Event("signalRReady"));
             });
-            
-            hubConnection.onclose(() => {
-                console.log("SignalR closed");
-                updateConnectionStatus('disconnected');
+
+            connection.onclose(() => {
+                console.log("❌ SignalR closed");
+                updateConnectionStatus("disconnected");
             });
-            
-            hubConnection.onopen(() => {
-                console.log("SignalR connection opened");
-                updateConnectionStatus('connected');
-            });
-            
+
             // Start connection
-            hubConnection.start()
+            connection.start()
                 .then(() => {
-                    console.log("SignalR connected successfully");
-                    signalRConnection = hubConnection;
-                    updateConnectionStatus('connected');
+                    console.log("✅ SignalR connected successfully");
+
+                    // 🔥 expose globally
+                    window.signalRConnection = connection;
+
+                    updateConnectionStatus("connected");
+
+                    // 🔥 notify pages
+                    window.dispatchEvent(new Event("signalRReady"));
                 })
                 .catch(err => {
-                    console.error("SignalR connection error:", err);
-                    updateConnectionStatus('error');
-                    // Retry after delay
+                    console.error("❌ SignalR start failed", err);
+                    updateConnectionStatus("error");
+
+                    // retry after delay
                     setTimeout(initGlobalSignalR, 5000);
                 });
         }
-        
+
         function updateConnectionStatus(status) {
-            const statusIcon = document.getElementById('signalRStatus');
-            const statusText = document.getElementById('signalRText');
-            
-            if (statusIcon && statusText) {
-                switch(status) {
-                    case 'connected':
-                        statusIcon.className = 'bi bi-circle-fill text-success me-2';
-                        statusText.textContent = 'Connected';
-                        break;
-                    case 'reconnecting':
-                        statusIcon.className = 'bi bi-circle-fill text-warning me-2';
-                        statusText.textContent = 'Reconnecting...';
-                        break;
-                    case 'disconnected':
-                        statusIcon.className = 'bi bi-circle-fill text-danger me-2';
-                        statusText.textContent = 'Disconnected';
-                        break;
-                    case 'error':
-                        statusIcon.className = 'bi bi-circle-fill text-danger me-2';
-                        statusText.textContent = 'Error';
-                        break;
-                }
+            const statusIcon = document.getElementById("signalRStatus");
+            const statusText = document.getElementById("signalRText");
+
+            if (!statusIcon || !statusText) return;
+
+            switch (status) {
+                case "connected":
+                    statusIcon.className = "bi bi-circle-fill text-success me-2";
+                    statusText.textContent = "Connected";
+                    break;
+                case "reconnecting":
+                    statusIcon.className = "bi bi-circle-fill text-warning me-2";
+                    statusText.textContent = "Reconnecting...";
+                    break;
+                case "disconnected":
+                    statusIcon.className = "bi bi-circle-fill text-danger me-2";
+                    statusText.textContent = "Disconnected";
+                    break;
+                case "error":
+                    statusIcon.className = "bi bi-circle-fill text-danger me-2";
+                    statusText.textContent = "Error";
+                    break;
             }
         }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', initGlobalSignalR);
+
+        document.addEventListener("DOMContentLoaded", initGlobalSignalR);
     </script>
+
     @RenderSection("Scripts", required: false)
+
 </body>
 </html>

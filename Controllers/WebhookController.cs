@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
 using WhatsAppMvcComplete.Data;
+using WhatsAppMvcComplete.Hubs;
 using WhatsAppMvcComplete.Models;
 using WhatsAppMvcComplete.Services;
 
@@ -16,17 +18,19 @@ public class WebhookController : ControllerBase
     private readonly IMessagingService _messagingService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<WebhookController> _logger;
-
+    private readonly IHubContext<ChatHub> _hubContext;
     public WebhookController(
         AppDbContext db,
         IMessagingService messagingService,
         IConfiguration configuration,
-        ILogger<WebhookController> logger)
+        ILogger<WebhookController> logger,
+        IHubContext<ChatHub> hubContext)
     {
         _db = db;
         _messagingService = messagingService;
         _configuration = configuration;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     /// <summary>
@@ -98,7 +102,15 @@ public class WebhookController : ControllerBase
 
         _db.MessageLogs.Add(log);
         await _db.SaveChangesAsync();
-
+        await _hubContext.Clients
+                .Group($"conversation-{conversation.Id}")
+                .SendAsync("ReceiveMessage", new
+                {
+                    conversationId = conversation.Id,
+                    body = body,
+                    inbound = true,
+                    time = message.CreatedAt.ToLocalTime().ToString("HH:mm")
+                });
         // Mark idempotency key as processed
         await MarkAsProcessedAsync(idempotencyKey, message.Id);
 
