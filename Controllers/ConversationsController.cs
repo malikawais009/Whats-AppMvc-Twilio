@@ -62,9 +62,18 @@ namespace WhatsAppMvcComplete.Controllers
                     return NotFound("Conversation not found");
                 }
 
+                // Clean the phone number - remove "whatsapp:" prefix if present
+                var cleanPhone = phoneNumber.Replace("whatsapp:", "").Replace("+", "");
+
+                // Find user by phone number
+                var user = await _db.Users.FirstOrDefaultAsync(u => 
+                    u.Phone.Contains(cleanPhone) || 
+                    (u.WhatsAppNumber != null && u.WhatsAppNumber.Contains(cleanPhone)));
+
                 // Create outbound message
                 var message = new Message
                 {
+                    UserId = user?.Id, // Set UserId if user found
                     ConversationId = conversationId,
                     MessageText = messageText,
                     Channel = MessageChannel.WhatsApp,
@@ -79,7 +88,7 @@ namespace WhatsAppMvcComplete.Controllers
                 await _db.SaveChangesAsync();
 
                 // Send via Twilio
-                var cleanPhone = phoneNumber.Replace("whatsapp:", "").Replace("+", "");
+                //var cleanPhone = phoneNumber.Replace("whatsapp:", "").Replace("+", "");
                 await _wa.SendAsync(cleanPhone, messageText);
 
                 // Update message status
@@ -116,8 +125,17 @@ namespace WhatsAppMvcComplete.Controllers
             var convo = _db.Conversations.Find(conversationId);
             if (convo == null) return NotFound();
 
+            // Clean the phone number - remove "whatsapp:" prefix if present
+            var cleanPhone = convo.PhoneNumber.Replace("whatsapp:", "").Replace("+", "");
+
+            // Find user by phone number
+            var user = await _db.Users.FirstOrDefaultAsync(u => 
+                u.Phone.Contains(cleanPhone) || 
+                (u.WhatsAppNumber != null && u.WhatsAppNumber.Contains(cleanPhone)));
+
             _db.Messages.Add(new Message
             {
+                UserId = user?.Id, // Set UserId if user found
                 ConversationId = conversationId,
                 MessageText = message,
                 Channel = MessageChannel.WhatsApp,
@@ -151,6 +169,7 @@ namespace WhatsAppMvcComplete.Controllers
         [HttpPost]
         public async Task<IActionResult> Start(string phone, string message)
         {
+            var originalPhone = phone;
             phone = phone.StartsWith("whatsapp:")
                 ? phone
                 : $"whatsapp:{phone}";
@@ -171,8 +190,17 @@ namespace WhatsAppMvcComplete.Controllers
                 await _db.SaveChangesAsync();
             }
 
+            // Clean the phone number - remove "whatsapp:" prefix if present
+            var cleanPhone = originalPhone.Replace("whatsapp:", "").Replace("+", "");
+
+            // Find user by phone number
+            var user = await _db.Users.FirstOrDefaultAsync(u => 
+                u.Phone.Contains(cleanPhone) || 
+                (u.WhatsAppNumber != null && u.WhatsAppNumber.Contains(cleanPhone)));
+
             _db.Messages.Add(new Message
             {
+                UserId = user?.Id, // Set UserId if user found
                 ConversationId = convo.Id,
                 MessageText = message,
                 Channel = MessageChannel.WhatsApp,

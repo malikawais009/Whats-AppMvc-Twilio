@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using WhatsAppMvcComplete.Data;
 using WhatsAppMvcComplete.Hubs;
 using WhatsAppMvcComplete.Models;
@@ -27,6 +28,9 @@ public class TwilioWebhookController : ControllerBase
         var from = form["From"].ToString(); 
         var body = form["Body"].ToString();
 
+        // Clean the phone number - remove "whatsapp:" prefix if present
+        var cleanFrom = from.Replace("whatsapp:", "").Replace("whatsapp:", "");
+
         if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(body))
             return Ok();
 
@@ -43,10 +47,14 @@ public class TwilioWebhookController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
+        // Find user by phone number (use cleaned number without whatsapp: prefix)
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Phone == cleanFrom || u.WhatsAppNumber == cleanFrom);
+
         // Save inbound message
         var msg = new Message
         {
-            ConversationId = convo.Id,
+            UserId = user?.Id, // Set UserId if user found
+            ConversationId = convo.Id, 
             Body = body,
             IsInbound = true,
             CreatedAt = DateTime.UtcNow

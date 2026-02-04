@@ -46,6 +46,9 @@ public class WebhookController : ControllerBase
         var messageSid = form["MessageSid"].ToString();
         var to = form["To"].ToString();
 
+        // Clean the phone number - remove "whatsapp:" prefix if present
+        var cleanFrom = from.Replace("whatsapp:", "");
+
         if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(body))
         {
             _logger.LogWarning("Received empty webhook - From: {From}, Body: {Body}", from, body);
@@ -75,8 +78,8 @@ public class WebhookController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
-        // Find user by phone number
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Phone == from || u.WhatsAppNumber == from);
+        // Find user by phone number (use cleaned number without whatsapp: prefix)
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Phone == cleanFrom || u.WhatsAppNumber == cleanFrom);
 
         // Store inbound message
         var message = new Message
