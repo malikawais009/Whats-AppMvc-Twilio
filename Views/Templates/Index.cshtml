@@ -16,6 +16,9 @@
         </nav>
     </div>
     <div>
+        <a asp-action="TwilioTemplates" class="btn btn-outline-info me-2">
+            <i class="bi bi-cloud-check me-1"></i>Twilio Templates
+        </a>
         <a asp-action="NeedsSync" class="btn btn-outline-warning me-2">
             <i class="bi bi-arrow-repeat me-1"></i>Needs Sync
         </a>
@@ -159,22 +162,21 @@
                                 </span>
                             </td>
                             <td>
-                                @if (!string.IsNullOrEmpty(template.MetaTemplateId))
+                                @if (!string.IsNullOrEmpty(template.TwilioContentSid))
                                 {
-                                    <span class="badge bg-info" title="@template.MetaTemplateId">
-                                        <i class="bi bi-check-circle me-1"></i>Submitted
-                                    </span>
-                                }
-                                else if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved)
-                                {
-                                    <span class="badge bg-warning text-dark" title="Not submitted to Meta">
-                                        <i class="bi bi-exclamation-circle me-1"></i>Pending
-                                    </span>
+                                    <div class="d-flex flex-column">
+                                        <span class="badge bg-info mb-1" title="@template.TwilioContentSid">
+                                            <i class="bi bi-check-circle me-1"></i>Created on Twilio
+                                        </span>
+                                        <span class="badge bg-success" title="@template.TwilioContentSid">
+                                            <i class="bi bi-hash me-1"></i>@template.TwilioContentSid.Substring(0, Math.Min(10, template.TwilioContentSid.Length))...
+                                        </span>
+                                    </div>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-secondary" title="Awaiting local approval">
-                                        <i class="bi bi-clock me-1"></i>Local
+                                    <span class="badge bg-secondary" title="Not yet created on Twilio">
+                                        <i class="bi bi-clock me-1"></i>Pending Create
                                     </span>
                                 }
                             </td>
@@ -182,13 +184,13 @@
                                 @if (!string.IsNullOrEmpty(template.TwilioContentSid))
                                 {
                                     <span class="badge bg-success" title="@template.TwilioContentSid">
-                                        <i class="bi bi-check-circle me-1"></i>Set
+                                        <i class="bi bi-check-circle me-1"></i>Ready (@template.Status)
                                     </span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-warning text-dark" title="ContentSid not configured">
-                                        <i class="bi bi-exclamation-circle me-1"></i>Not Set
+                                    <span class="badge bg-warning text-dark" title="ContentSid not yet available">
+                                        <i class="bi bi-clock me-1"></i>Waiting
                                     </span>
                                 }
                             </td>
@@ -196,7 +198,7 @@
                             <td><small>@template.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small></td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a asp-action="Details" asp-route-id="@template.Id" class="btn btn-outline-primary" title="View">
+                                    <a asp-action="Details" asp-route-id="@template.Id" class="btn btn-outline-primary" title="View Details">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     @if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Draft)
@@ -216,11 +218,13 @@
                                             <i class="bi bi-x-lg"></i>
                                         </a>
                                     }
-                                    @if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved && string.IsNullOrEmpty(template.TwilioContentSid))
+                                    @if (!string.IsNullOrEmpty(template.MetaTemplateId) && string.IsNullOrEmpty(template.TwilioContentSid))
                                     {
-                                        <a asp-action="UpdateContentSid" asp-route-id="@template.Id" class="btn btn-outline-warning" title="Add ContentSid">
-                                            <i class="bi bi-link"></i>
-                                        </a>
+                                        <form asp-action="SyncContentSid" asp-route-templateId="@template.Id" method="post" class="d-inline">
+                                            <button type="submit" class="btn btn-outline-warning" title="Sync ContentSid" onclick="return confirm('Sync ContentSid from Meta?');">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                        </form>
                                     }
                                 </div>
                             </td>

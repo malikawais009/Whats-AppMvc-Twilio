@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
 using WhatsAppMvcComplete.Data;
 using WhatsAppMvcComplete.Models;
 
@@ -10,6 +11,7 @@ namespace WhatsAppMvcComplete.Services;
 /// </summary>
 public interface IMetaApiService
 {
+    Task<bool> CreateTemplateOnMetaAsync(int templateId);
     Task<bool> SubmitTemplateAsync(int templateId);
     Task<MetaTemplateStatus?> GetTemplateStatusAsync(string metaTemplateId);
     Task<bool> SyncTemplateStatusAsync(int templateId);
@@ -45,7 +47,162 @@ public class MetaApiService : IMetaApiService
     }
 
     /// <summary>
+    /// Create a template directly on Meta/Twilio when created in the dashboard
+    /// This automatically creates the template on Meta and returns the MetaTemplateId
+    /// </summary>
+    public async Task<bool> CreateTemplateOnMetaAsync(int templateId)
+    {
+        var template = await _db.Templates.FindAsync(templateId);
+        if (template == null)
+        {
+            _logger.LogWarning("Template {TemplateId} not found", templateId);
+            return false;
+        }
+
+        // Check if already created on Meta
+        if (!string.IsNullOrEmpty(template.MetaTemplateId))
+        {
+            _logger.LogInformation("Template {TemplateId} already has MetaTemplateId: {MetaId}", 
+                templateId, template.MetaTemplateId);
+            return true;
+        }
+
+        try
+        {
+            // Map local category to Meta category
+            var metaCategory = template.Category?.ToUpper() switch
+            {
+                "MARKETING" => "MARKETING",
+                "AUTHENTICATION" => "AUTHENTICATION",
+                "OTP" => "AUTHENTICATION",
+                "TRANSACTIONAL" => "UTILITY",
+                "UTILITY" => "UTILITY",
+                "SUPPORT" => "UTILITY",
+                _ => "MARKETING"
+            };
+
+            // Clean template name (remove special characters, lowercase)
+            var cleanName = template.Name.ToLower()
+                .Replace(" ", "_")
+                .Replace("-", "_")
+                .Replace(".", "_")
+                .Replace("@", "_")
+                .Replace("#", "_");
+
+            // Parse template text to find parameters (e.g., {{1}}, {{2}} or {{name}}, {{code}})
+            var parameters = ParseTemplateParameters(template.TemplateText);
+
+            // Build components array based on parameters
+            var components = new List<object>();
+
+            // Add body with parameters
+            if (parameters.Any())
+            {
+                components.Add(new
+                {
+                    type = "BODY",
+                    text = template.TemplateText,
+                    example = new
+                    {
+                        body_text = new List<List<string>>
+                        {
+                            parameters.Select(p => $"example_{p}").ToList()
+                        }
+                    }
+                });
+            }
+            else
+            {
+                components.Add(new
+                {
+                    type = "BODY",
+                    text = template.TemplateText
+                });
+            }
+
+            var requestBody = new
+            {
+                name = cleanName,
+                language = template.Language ?? "en_US",
+                category = metaCategory,
+                components = components
+            };
+
+            var json = JsonConvert.SerializeObject(requestBody, Formatting.Indented);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            _logger.LogDebug("Creating template on Meta: {RequestBody}", json);
+
+            var response = await _httpClient.PostAsync($"/{_businessAccountId}/message_templates?access_token={_accessToken}", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseJson = await response.Content.ReadAsStringAsync();
+                dynamic responseObj = JsonConvert.DeserializeObject(responseJson)!;
+                
+                template.MetaTemplateId = responseObj.id;
+                template.Status = TemplateStatus.Pending; // Auto-pending after creation
+                template.SubmittedAt = DateTime.UtcNow;
+                template.UpdatedAt = DateTime.UtcNow;
+                
+                await _db.SaveChangesAsync();
+                
+                _logger.LogInformation("Template {TemplateId} created successfully on Meta. MetaTemplateId: {MetaId}", 
+                    templateId, template.MetaTemplateId);
+                
+                return true;
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to create template {TemplateId} on Meta. Status: {Status}, Response: {Response}\nRequest: {Request}", 
+                    templateId, response.StatusCode, errorContent, json);
+                
+                // Even if creation fails, mark as Draft so user can try again
+                template.Status = TemplateStatus.Draft;
+                await _db.SaveChangesAsync();
+                
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating template {TemplateId} on Meta", templateId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Parse template text to find parameters (e.g., {{1}}, {{2}}, {{name}}, {{code}})
+    /// </summary>
+    private List<string> ParseTemplateParameters(string templateText)
+    {
+        var parameters = new List<string>();
+        
+        // Match {{1}}, {{2}}, etc.
+        var numericPattern = @"\{\{\d+\}\}";
+        var numericMatches = System.Text.RegularExpressions.Regex.Matches(templateText, numericPattern);
+        foreach (Match match in numericMatches)
+        {
+            if (!parameters.Contains(match.Value))
+                parameters.Add(match.Value);
+        }
+
+        // Match {{name}}, {{code}}, etc.
+        var textPattern = @"\{\{[a-zA-Z_]+\}\}";
+        var textMatches = System.Text.RegularExpressions.Regex.Matches(templateText, textPattern);
+        foreach (Match match in textMatches)
+        {
+            if (!parameters.Contains(match.Value))
+                parameters.Add(match.Value);
+        }
+
+        return parameters;
+    }
+
+    /// <summary>
     /// Submit an approved template to Meta for WhatsApp approval
+    /// This is called when admin approves a template locally and wants to create it on Twilio/Meta
     /// </summary>
     public async Task<bool> SubmitTemplateAsync(int templateId)
     {
@@ -56,10 +213,20 @@ public class MetaApiService : IMetaApiService
             return false;
         }
 
-        if (template.Status != TemplateStatus.Approved)
+        // Allow submission if locally approved or if it has a MetaTemplateId (already on Meta)
+        if (template.Status != TemplateStatus.Approved && template.Status != TemplateStatus.Pending)
         {
-            _logger.LogWarning("Template {TemplateId} is not approved. Current status: {Status}", templateId, template.Status);
+            _logger.LogWarning("Template {TemplateId} is not locally approved. Current status: {Status}. It must be approved locally first.", 
+                templateId, template.Status);
             return false;
+        }
+
+        // If already has MetaTemplateId, we're resubmitting
+        if (!string.IsNullOrEmpty(template.MetaTemplateId))
+        {
+            _logger.LogInformation("Template {TemplateId} already has MetaTemplateId: {MetaId}. Skipping submission.", 
+                templateId, template.MetaTemplateId);
+            return true;
         }
 
         try
@@ -229,7 +396,8 @@ public class MetaApiService : IMetaApiService
     }
 
     /// <summary>
-    /// Sync ContentSid from Meta for approved templates
+    /// Sync ContentSid from Meta for templates
+    /// Works for pending and approved templates
     /// </summary>
     public async Task<bool> SyncContentSidFromMetaAsync(int templateId)
     {
@@ -246,9 +414,10 @@ public class MetaApiService : IMetaApiService
             return false;
         }
 
-        if (template.Status != TemplateStatus.Approved)
+        // ContentSid is typically available after Meta approval, but we try anyway
+        if (template.Status != TemplateStatus.Approved && template.Status != TemplateStatus.Pending)
         {
-            _logger.LogWarning("Template {TemplateId} is not approved by Meta. Status: {Status}", templateId, template.Status);
+            _logger.LogWarning("Template {TemplateId} is not pending or approved by Meta. Status: {Status}", templateId, template.Status);
             return false;
         }
 

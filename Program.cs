@@ -35,6 +35,7 @@ builder.Services.AddScoped<IMetaWebhookHandler, MetaWebhookHandler>();
 builder.Services.AddScoped<IWhatsAppService, WhatsAppService>();
 builder.Services.AddScoped<IMessagingService, MessagingService>();
 builder.Services.AddScoped<ITemplateService, TemplateService>();
+builder.Services.AddScoped<ITwilioTemplateService, TwilioTemplateService>();
 
 // Background Services
 builder.Services.AddHostedService<MessageSchedulerService>();

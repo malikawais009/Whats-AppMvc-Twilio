@@ -55,6 +55,20 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Language</label>
+                        <select name="language" class="form-select">
+                            <option value="en_US">English (US)</option>
+                            <option value="en_GB">English (UK)</option>
+                            <option value="es">Spanish</option>
+                            <option value="pt_BR">Portuguese (Brazil)</option>
+                            <option value="ar">Arabic</option>
+                            <option value="hi">Hindi</option>
+                            <option value="ur">Urdu</option>
+                        </select>
+                        <small class="text-muted">Template language for Meta approval</small>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">Template Text</label>
                         <textarea name="templateText" id="templateText" class="form-control" rows="6" required
                                   placeholder="Enter your template. Use {{parameter_name}} for placeholders."

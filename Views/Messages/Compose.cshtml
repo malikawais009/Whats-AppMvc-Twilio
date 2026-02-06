@@ -4,6 +4,9 @@
     
     var usersList = (List<WhatsAppMvcComplete.Models.User>)(ViewBag.Users ?? new List<WhatsAppMvcComplete.Models.User>());
     var templatesList = (List<WhatsAppMvcComplete.Models.Template>)(ViewBag.Templates ?? new List<WhatsAppMvcComplete.Models.Template>());
+    
+    var selectedTemplateSid = (string)(ViewBag.SelectedTemplateSid ?? "");
+    var selectedTemplateName = (string)(ViewBag.SelectedTemplateName ?? "");
 }
 
 <div class="page-header">
@@ -33,98 +36,210 @@
 
 <div class="row">
     <div class="col-md-8">
+        <!-- Twilio Template Selected Message -->
+        @if (!string.IsNullOrEmpty(selectedTemplateSid))
+        {
+            <div class="alert alert-info mb-3">
+                <i class="bi bi-cloud-check me-2"></i>
+                <strong>Using Twilio Template:</strong> @selectedTemplateSid
+                <a href="/Messages/Compose" class="btn btn-sm btn-outline-info ms-2">Clear</a>
+            </div>
+        }
+
         <div class="card">
             <div class="card-header">
                 <i class="bi bi-pencil-square me-2"></i>New Message
             </div>
             <div class="card-body">
-                <form asp-controller="Messages" asp-action="SendMessage" method="post">
-                    @Html.AntiForgeryToken()
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Select User</label>
-                                <select name="userId" class="form-select" required>
-                                    <option value="">Choose a user...</option>
-                                    @foreach (var user in usersList)
-                                    {
-                                        <option value="@user.Id">@user.Name (@user.Phone)</option>
-                                    }
-                                </select>
+                @if (!string.IsNullOrEmpty(selectedTemplateSid))
+                {
+                    <!-- Send with Twilio Template Form -->
+                    <form asp-controller="Messages" asp-action="SendWithTemplate" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="contentSid" value="@selectedTemplateSid" />
+                        <input type="hidden" name="templateName" value="@selectedTemplateName" />
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Select User</label>
+                                    <select name="userId" class="form-select" required>
+                                        <option value="">Choose a user...</option>
+                                        @foreach (var user in usersList)
+                                        {
+                                            <option value="@user.Id">@user.Name (@user.Phone)</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Channel</label>
-                                <select name="channel" class="form-select" id="channelSelect" required onchange="toggleTemplateSection()">
-                                    <option value="SMS">SMS</option>
-                                    <option value="WhatsApp">WhatsApp</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Template Section (WhatsApp only) -->
-                    <div class="mb-3" id="templateSection" style="display: none;">
-                        <label class="form-label">Use Template (Optional for WhatsApp)</label>
-                        <select name="templateId" class="form-select" id="templateSelect" onchange="loadTemplateParameters()">
-                            <option value="">No template - Free text</option>
-                            @foreach (var template in templatesList)
-                            {
-                                <option value="@template.Id" data-text="@template.TemplateText">@template.Name</option>
-                            }
-                        </select>
-                        <small class="text-muted">Only approved templates can be used</small>
-                    </div>
-
-                    <!-- Parameters Section -->
-                    <div class="mb-3" id="parametersSection" style="display: none;">
-                        <label class="form-label">Template Parameters</label>
-                        <div id="parametersContainer" class="p-3 bg-light rounded">
-                            <p class="text-muted mb-0">Select a template to see parameters</p>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Message</label>
-                        <textarea name="messageText" class="form-control" rows="4" id="messageText" required
-                                  placeholder="Type your message here..."></textarea>
-                        <small class="text-muted">Characters: <span id="charCount">0</span></small>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Schedule (Optional)</label>
-                                <input type="datetime-local" name="scheduledAt" class="form-control">
-                                <small class="text-muted">Leave empty to send immediately</small>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">&nbsp;</label>
-                                <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" id="isScheduled">
-                                    <label class="form-check-label" for="isScheduled">Schedule for later</label>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Channel</label>
+                                    <select name="channel" class="form-select" disabled>
+                                        <option value="WhatsApp">WhatsApp</option>
+                                    </select>
+                                    <small class="text-muted">Using Twilio template</small>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-send me-2"></i>Send Message
-                        </button>
-                        <a href="/Dashboard" class="btn btn-secondary">
-                            <i class="bi bi-x-lg me-2"></i>Cancel
-                        </a>
-                    </div>
-                </form>
+                        <div class="mb-3">
+                            <label class="form-label">Template Parameters</label>
+                            <div class="p-3 bg-light rounded">
+                                <p class="text-muted small mb-2">Enter values for template parameters:</p>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label class="form-label small">1</label>
+                                            <input type="text" name="templateParameters[1]" class="form-control" placeholder="Parameter 1">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label class="form-label small">2</label>
+                                            <input type="text" name="templateParameters[2]" class="form-control" placeholder="Parameter 2">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label class="form-label small">3</label>
+                                            <input type="text" name="templateParameters[3]" class="form-control" placeholder="Parameter 3">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label class="form-label small">4</label>
+                                            <input type="text" name="templateParameters[4]" class="form-control" placeholder="Parameter 4">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Schedule (Optional)</label>
+                                    <input type="datetime-local" name="scheduledAt" class="form-control">
+                                    <small class="text-muted">Leave empty to send immediately</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-send me-2"></i>Send with Twilio Template
+                            </button>
+                            <a href="/Messages/Compose" class="btn btn-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <!-- Standard Message Form -->
+                    <form asp-controller="Messages" asp-action="SendMessage" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Select User</label>
+                                    <select name="userId" class="form-select" required>
+                                        <option value="">Choose a user...</option>
+                                        @foreach (var user in usersList)
+                                        {
+                                            <option value="@user.Id">@user.Name (@user.Phone)</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Channel</label>
+                                    <select name="channel" class="form-select" id="channelSelect" required onchange="toggleTemplateSection()">
+                                        <option value="SMS">SMS</option>
+                                        <option value="WhatsApp">WhatsApp</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Template Section (WhatsApp only) -->
+                        <div class="mb-3" id="templateSection" style="display: none;">
+                            <label class="form-label">Use Template (Optional for WhatsApp)</label>
+                            <select name="templateId" class="form-select" id="templateSelect" onchange="loadTemplateParameters()">
+                                <option value="">No template - Free text</option>
+                                @foreach (var template in templatesList)
+                                {
+                                    <option value="@template.Id" data-text="@template.TemplateText">@template.Name</option>
+                                }
+                            </select>
+                            <small class="text-muted">Only approved templates can be used</small>
+                        </div>
+
+                        <!-- Parameters Section -->
+                        <div class="mb-3" id="parametersSection" style="display: none;">
+                            <label class="form-label">Template Parameters</label>
+                            <div id="parametersContainer" class="p-3 bg-light rounded">
+                                <p class="text-muted mb-0">Select a template to see parameters</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Message</label>
+                            <textarea name="messageText" class="form-control" rows="4" id="messageText" required
+                                      placeholder="Type your message here..."></textarea>
+                            <small class="text-muted">Characters: <span id="charCount">0</span></small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Schedule (Optional)</label>
+                                    <input type="datetime-local" name="scheduledAt" class="form-control">
+                                    <small class="text-muted">Leave empty to send immediately</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" id="isScheduled">
+                                        <label class="form-check-label" for="isScheduled">Schedule for later</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send me-2"></i>Send Message
+                            </button>
+                            <a href="/Dashboard" class="btn btn-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                }
             </div>
         </div>
     </div>
 
     <div class="col-md-4">
+        <!-- Twilio Templates Card -->
+        <div class="card mb-3 border-info">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-cloud-check me-2"></i>Twilio Templates
+            </div>
+            <div class="card-body">
+                <p class="small mb-2">Use approved templates from Twilio directly:</p>
+                <a asp-controller="Templates" asp-action="TwilioTemplates" class="btn btn-outline-info w-100">
+                    <i class="bi bi-list me-1"></i>Browse Twilio Templates
+                </a>
+            </div>
+        </div>
+
         <!-- Tips Card -->
         <div class="card mb-3">
             <div class="card-header bg-info text-white">
@@ -132,8 +247,9 @@
             </div>
             <div class="card-body">
                 <ul class="mb-0 small">
-                    <li class="mb-2">Use <strong>{{name}}</strong> for personalized messages</li>
+                    <li class="mb-2">Use <strong>{{1}}</strong>, <strong>{{2}}</strong> for positional parameters</li>
                     <li class="mb-2">WhatsApp templates must be approved before use</li>
+                    <li class="mb-2">Browse Twilio templates above for more options</li>
                     <li class="mb-2">Scheduled messages are sent automatically</li>
                     <li>Failed messages are retried up to 3 times</li>
                 </ul>
@@ -147,7 +263,7 @@
             </div>
             <div class="card-body">
                 <div class="d-flex justify-content-between mb-2">
-                    <span>Approved Templates:</span>
+                    <span>Local Templates:</span>
                     <strong>@templatesList.Count</strong>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
@@ -167,7 +283,7 @@
 @section Scripts {
     <script>
         // Character count
-        document.getElementById('messageText').addEventListener('input', function() {
+        document.getElementById('messageText')?.addEventListener('input', function() {
             document.getElementById('charCount').textContent = this.value.length;
         });
 

@@ -1,0 +1,150 @@
+@model List<WhatsAppMvcComplete.Services.TwilioTemplateInfo>
+
+@{
+    ViewData["Title"] = "Twilio Approved Templates";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-cloud-check"></i> Twilio Approved Templates</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="/Templates">Templates</a></li>
+                <li class="breadcrumb-item active">Twilio Templates</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        <a asp-action="Index" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left me-1"></i>Back to Templates
+        </a>
+    </div>
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Info Card -->
+<div class="alert alert-info mb-4">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>These templates are fetched directly from Twilio.</strong>
+    Only templates with <span class="badge bg-success">approved</span> status can be used to send WhatsApp messages.
+    Select a template to view details or use it for messaging.
+</div>
+
+<!-- Templates Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list me-2"></i>Approved Templates (@Model.Count)</span>
+        <form asp-action="TwilioTemplates" method="get" class="d-inline">
+            <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        @if (Model.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th><i class="bi bi-hash me-1"></i>SID</th>
+                            <th><i class="bi bi-card-text me-1"></i>Name</th>
+                            <th><i class="bi bi-tag me-1"></i>Category</th>
+                            <th><i class="bi bi-globe me-1"></i>Language</th>
+                            <th><i class="bi bi-check-circle me-1"></i>Status</th>
+                            <th><i class="bi bi-gear me-1"></i>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var template in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <code>@template.Sid</code>
+                                </td>
+                                <td>
+                                    <strong>@template.FriendlyName</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">@template.Category</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">@template.Language</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle me-1"></i>@template.Status
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a asp-controller="Messages" asp-action="Compose" asp-route-templateSid="@template.Sid" 
+                                           class="btn btn-outline-success" title="Use this template">
+                                            <i class="bi bi-send"></i> Send Message
+                                        </a>
+                                        <a href="https://console.twilio.com/us1/develop/sms/content-template-builder?frameUrl=%2Fconsole%2Fsms%2Ftemplates%2Fcontent%3F__override_profile_name%3Ddefault&searchTerm=@template.FriendlyName" 
+                                           target="_blank" class="btn btn-outline-primary" title="View in Twilio Console">
+                                            <i class="bi bi-box-arrow-up-right"></i> Twilio Console
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                <p class="text-muted mt-3">No approved templates found in Twilio</p>
+                <p class="text-muted small">
+                    Templates may still be pending approval or no templates have been created yet.
+                </p>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- How to Use -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-book me-2"></i>How to Use Templates
+            </div>
+            <div class="card-body">
+                <ol class="mb-0 small">
+                    <li class="mb-2">Templates must have <span class="badge bg-success">approved</span> status</li>
+                    <li class="mb-2">Click <strong>Send Message</strong> to use a template</li>
+                    <li class="mb-2">Fill in the template parameters (like {{1}}, {{2}})</li>
+                    <li class="mb-2">Send the message to your recipients</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>Template Parameters
+            </div>
+            <div class="card-body">
+                <h6>Placeholder Format</h6>
+                <p class="small mb-2">Templates use positional parameters:</p>
+                <code class="d-block mb-2">Hello {{1}}, your order {{2}} is confirmed.</code>
+                <p class="small mb-1">When sending, provide values:</p>
+                <code class="d-block">&#123; "1": "John", "2": "ORD-12345" &#125;</code>
+            </div>
+        </div>
+    </div>
+</div>

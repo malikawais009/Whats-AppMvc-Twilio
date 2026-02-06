@@ -9,18 +9,18 @@ namespace WhatsAppMvcComplete.Controllers;
 public class TemplatesController : Controller
 {
     private readonly ITemplateService _templateService;
-    private readonly IMetaApiService _metaApiService;
+    private readonly ITwilioTemplateService _twilioTemplateService;
     private readonly AppDbContext _db;
     private readonly ILogger<TemplatesController> _logger;
 
     public TemplatesController(
         ITemplateService templateService, 
-        IMetaApiService metaApiService,
+        ITwilioTemplateService twilioTemplateService,
         AppDbContext db, 
         ILogger<TemplatesController> logger)
     {
         _templateService = templateService;
-        _metaApiService = metaApiService;
+        _twilioTemplateService = twilioTemplateService;
         _db = db;
         _logger = logger;
     }
@@ -74,9 +74,10 @@ public class TemplatesController : Controller
 
     /// <summary>
     /// Create a new template
+    /// Template is automatically created on Twilio Content Template Builder
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> Create(string name, string templateText, string? category)
+    public async Task<IActionResult> Create(string name, string templateText, string? category, string? language)
     {
         try
         {
@@ -89,10 +90,45 @@ public class TemplatesController : Controller
             var template = await _templateService.CreateTemplateAsync(
                 name,
                 templateText,
-                "CurrentUser" // In production, get from auth
+                "CurrentUser", // In production, get from auth
+                MessageChannel.WhatsApp,
+                category,
+                language
             );
 
-            TempData["Success"] = "Template created successfully. It is saved as Draft and ready for submission.";
+            // Automatically create template on Twilio Content Template Builder
+            try
+            {
+                var (success, contentSid, error) = await _twilioTemplateService.CreateTemplateAsync(template);
+                
+                if (success && !string.IsNullOrEmpty(contentSid))
+                {
+                    // Update local template with Twilio ContentSid
+                    template.TwilioContentSid = contentSid;
+                    template.Status = TemplateStatus.Pending; // Awaiting Meta approval via Twilio
+                    template.SubmittedAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+
+                    _logger.LogInformation("Template {TemplateId} created on Twilio. ContentSid: {ContentSid}", 
+                        template.Id, contentSid);
+
+                    TempData["Success"] = $"Template created successfully on Twilio Content Template Builder. " +
+                        $"ContentSid: {contentSid}. " +
+                        $"The template has been submitted to Meta for approval. Check the details page for status updates.";
+                }
+                else
+                {
+                    _logger.LogError("Failed to create template on Twilio. Error: {Error}", error);
+                    TempData["Warning"] = $"Template created locally but failed to create on Twilio. Error: {error}. " +
+                        "You can retry from the template details page.";
+                }
+            }
+            catch (Exception twilioEx)
+            {
+                _logger.LogError(twilioEx, "Error creating template on Twilio");
+                TempData["Warning"] = "Template created locally but failed to create on Twilio. You can retry from the template details page.";
+            }
+
             return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
@@ -132,12 +168,56 @@ public class TemplatesController : Controller
     }
 
     /// <summary>
-    /// Show approved templates
+    /// Show approved templates from local database
     /// </summary>
     public async Task<IActionResult> ApprovedTemplates()
     {
         var templates = await _templateService.GetApprovedTemplatesAsync();
         return View("ApprovedTemplates", templates.ToList());
+    }
+
+    /// <summary>
+    /// List approved templates from Twilio for selection
+    /// Use this to get templates to send WhatsApp messages
+    /// </summary>
+    public async Task<IActionResult> TwilioTemplates()
+    {
+        try
+        {
+            var templates = await _twilioTemplateService.ListApprovedTemplatesAsync();
+            return View("TwilioTemplates", templates);
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Failed to fetch templates from Twilio: {ex.Message}";
+            return View("TwilioTemplates", new List<TwilioTemplateInfo>());
+        }
+    }
+
+    /// <summary>
+    /// Sync template status from Twilio
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> SyncFromTwilio(int templateId)
+    {
+        try
+        {
+            var result = await _twilioTemplateService.SyncTemplateStatusAsync(templateId);
+            if (result)
+            {
+                TempData["Success"] = "Template status synced from Twilio.";
+            }
+            else
+            {
+                TempData["Error"] = "Failed to sync template status.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Failed to sync: {ex.Message}";
+        }
+
+        return RedirectToAction(nameof(Details), new { id = templateId });
     }
 
     /// <summary>
@@ -160,7 +240,7 @@ public class TemplatesController : Controller
     }
 
     /// <summary>
-    /// Approve a template
+    /// Approve a template for use
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Approve(int templateId, string? comments)
@@ -345,116 +425,6 @@ public class TemplatesController : Controller
     {
         var templates = await _templateService.GetTemplatesNeedingSyncAsync();
         return View("NeedsSync", templates.Select(t => t.Item1).ToList());
-    }
-
-    /// <summary>
-    /// Submit approved template to Meta for WhatsApp approval
-    /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> SubmitToMeta(int templateId)
-    {
-        try
-        {
-            var result = await _metaApiService.SubmitTemplateAsync(templateId);
-            if (result)
-            {
-                TempData["Success"] = "Template submitted to Meta for WhatsApp approval.";
-            }
-            else
-            {
-                TempData["Error"] = "Failed to submit template to Meta. Check logs for details.";
-            }
-        }
-        catch (Exception ex)
-        {
-            TempData["Error"] = $"Failed to submit template: {ex.Message}";
-        }
-
-        return RedirectToAction(nameof(Details), new { id = templateId });
-    }
-
-    /// <summary>
-    /// Sync template status from Meta API
-    /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> SyncFromMeta(int templateId)
-    {
-        try
-        {
-            var result = await _metaApiService.SyncTemplateStatusAsync(templateId);
-            if (result)
-            {
-                TempData["Success"] = "Template status synced from Meta.";
-            }
-            else
-            {
-                TempData["Error"] = "Failed to sync template status. Template may not be submitted to Meta.";
-            }
-        }
-        catch (Exception ex)
-        {
-            TempData["Error"] = $"Failed to sync template: {ex.Message}";
-        }
-
-        return RedirectToAction(nameof(Details), new { id = templateId });
-    }
-
-    /// <summary>
-    /// Sync ContentSid from Meta for approved templates
-    /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> SyncContentSid(int templateId)
-    {
-        try
-        {
-            var result = await _metaApiService.SyncContentSidFromMetaAsync(templateId);
-            if (result)
-            {
-                TempData["Success"] = "ContentSid synced from Meta.";
-            }
-            else
-            {
-                TempData["Error"] = "Failed to sync ContentSid. Template may not be approved by Meta.";
-            }
-        }
-        catch (Exception ex)
-        {
-            TempData["Error"] = $"Failed to sync ContentSid: {ex.Message}";
-        }
-
-        return RedirectToAction(nameof(Details), new { id = templateId });
-    }
-
-    /// <summary>
-    /// Bulk sync all approved templates from Meta
-    /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> BulkSyncFromMeta()
-    {
-        try
-        {
-            var templates = await _templateService.GetApprovedTemplatesAsync();
-            var successCount = 0;
-            var failCount = 0;
-
-            foreach (var template in templates)
-            {
-                if (!string.IsNullOrEmpty(template.MetaTemplateId))
-                {
-                    var result = await _metaApiService.SyncTemplateStatusAsync(template.Id);
-                    if (result) successCount++;
-                    else failCount++;
-                }
-            }
-
-            TempData["Success"] = $"Synced {successCount} templates from Meta. {failCount} failed.";
-        }
-        catch (Exception ex)
-        {
-            TempData["Error"] = $"Bulk sync failed: {ex.Message}";
-        }
-
-        return RedirectToAction(nameof(Index));
     }
 
     /// <summary>

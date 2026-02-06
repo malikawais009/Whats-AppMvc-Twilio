@@ -8,7 +8,7 @@ namespace WhatsAppMvcComplete.Services;
 public interface ITemplateService
 {
     // Basic CRUD
-    Task<Template> CreateTemplateAsync(string name, string templateText, string createdBy, MessageChannel channel = MessageChannel.WhatsApp);
+    Task<Template> CreateTemplateAsync(string name, string templateText, string createdBy, MessageChannel channel = MessageChannel.WhatsApp, string? category = null, string? language = null);
     Task<Template?> GetTemplateByIdAsync(int id);
     Task<IEnumerable<Template>> GetAllTemplatesAsync();
     Task<bool> UpdateTemplateAsync(int id, string name, string templateText);
@@ -43,7 +43,7 @@ public class TemplateService : ITemplateService
         _logger = logger;
     }
 
-    public async Task<Template> CreateTemplateAsync(string name, string templateText, string createdBy, MessageChannel channel = MessageChannel.WhatsApp)
+    public async Task<Template> CreateTemplateAsync(string name, string templateText, string createdBy, MessageChannel channel = MessageChannel.WhatsApp, string? category = null, string? language = null)
     {
         var template = new Template
         {
@@ -51,6 +51,8 @@ public class TemplateService : ITemplateService
             Channel = channel,
             TemplateText = templateText,
             Status = TemplateStatus.Draft,
+            Category = category ?? "MARKETING",
+            Language = language ?? "en_US",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             CreatedBy = createdBy

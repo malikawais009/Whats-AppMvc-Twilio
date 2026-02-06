@@ -11,18 +11,24 @@ public class MessagesController : Controller
     private readonly AppDbContext _db;
     private readonly IMessagingService _messagingService;
     private readonly ITemplateService _templateService;
+    private readonly ITwilioTemplateService _twilioTemplateService;
 
     public MessagesController(
         AppDbContext db, 
         IMessagingService messagingService,
-        ITemplateService templateService)
+        ITemplateService templateService,
+        ITwilioTemplateService twilioTemplateService)
     {
         _db = db;
         _messagingService = messagingService;
         _templateService = templateService;
+        _twilioTemplateService = twilioTemplateService;
     }
 
-    public async Task<IActionResult> Compose()
+    /// <summary>
+    /// Compose a new message
+    /// </summary>
+    public async Task<IActionResult> Compose(string? templateSid)
     {
         var users = await _db.Users.ToListAsync();
         var templates = await _templateService.GetApprovedTemplatesAsync();
@@ -30,7 +36,99 @@ public class MessagesController : Controller
         ViewBag.Users = users;
         ViewBag.Templates = templates;
         
+        // If templateSid is provided, fetch template details from Twilio
+        if (!string.IsNullOrEmpty(templateSid))
+        {
+            var (status, friendlyName, error) = await _twilioTemplateService.GetApprovalStatusAsync(templateSid);
+            if (status == "approved")
+            {
+                ViewBag.SelectedTemplateSid = templateSid;
+                ViewBag.SelectedTemplateName = friendlyName;
+            }
+        }
+        
         return View();
+    }
+
+    /// <summary>
+    /// Send a message using Twilio ContentSid
+    /// This is used when selecting a template from TwilioTemplates page
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> SendWithTemplate(
+        int userId, 
+        string contentSid, 
+        string templateName,
+        Dictionary<string, string> templateParameters,
+        DateTime? scheduledAt)
+    {
+        try
+        {
+            if (userId <= 0)
+            {
+                TempData["Error"] = "Please select a user";
+                return RedirectToAction(nameof(Compose));
+            }
+
+            if (string.IsNullOrEmpty(contentSid))
+            {
+                TempData["Error"] = "Template SID is required";
+                return RedirectToAction(nameof(Compose));
+            }
+
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null)
+            {
+                TempData["Error"] = "User not found";
+                return RedirectToAction(nameof(Compose));
+            }
+
+            // Verify template is approved before sending
+            var (status, _, error) = await _twilioTemplateService.GetApprovalStatusAsync(contentSid);
+            if (status != "approved")
+            {
+                TempData["Error"] = $"Template is not approved. Current status: {status}";
+                return RedirectToAction(nameof(Compose));
+            }
+
+            // Send the template message using Twilio
+            var parameters = templateParameters ?? new Dictionary<string, string>();
+            var sendResult = await _twilioTemplateService.SendTemplateMessageAsync(
+                user.Phone, 
+                contentSid, 
+                parameters);
+
+            if (sendResult.Success)
+            {
+                // Log the message in our database
+                var message = new Message
+                {
+                    UserId = userId,
+                    MessageText = $"Template: {templateName}",
+                    Channel = MessageChannel.WhatsApp,
+                    Status = MessageStatus.Sent,
+                    TwilioMessageId = sendResult.MessageSid,
+                    CreatedAt = DateTime.UtcNow,
+                    ScheduledAt = scheduledAt
+                };
+                _db.Messages.Add(message);
+                await _db.SaveChangesAsync();
+
+                TempData["Success"] = scheduledAt.HasValue 
+                    ? $"Message scheduled for {scheduledAt.Value:yyyy-MM-dd HH:mm}"
+                    : $"Message sent successfully using template '{templateName}'. MessageSid: {sendResult.MessageSid}";
+            }
+            else
+            {
+                TempData["Error"] = $"Failed to send message: {sendResult.ErrorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Failed to send message: {ex.Message}";
+        }
+
+        return RedirectToAction(nameof(Compose));
     }
 
     [HttpPost]

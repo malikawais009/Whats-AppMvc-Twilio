@@ -200,7 +200,7 @@ namespace WhatsAppMvcComplete.Controllers
 
             _db.Messages.Add(new Message
             {
-                UserId = user?.Id, // Set UserId if user found
+                UserId = user?.Id ?? null,
                 ConversationId = convo.Id,
                 MessageText = message,
                 Channel = MessageChannel.WhatsApp,
