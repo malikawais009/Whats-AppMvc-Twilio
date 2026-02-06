@@ -50,6 +50,11 @@ public interface ITwilioTemplateService
     /// Sync local template with Twilio approval status
     /// </summary>
     Task<bool> SyncTemplateStatusAsync(int templateId);
+
+    /// <summary>
+    /// Sync ContentSid from Meta for a template that has MetaTemplateId but no TwilioContentSid
+    /// </summary>
+    Task<bool> SyncContentSidFromMetaAsync(int templateId);
 }
 
 public class TwilioTemplateService : ITwilioTemplateService
@@ -346,6 +351,51 @@ public class TwilioTemplateService : ITwilioTemplateService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error syncing template {TemplateId}", templateId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Sync ContentSid from Meta for a template that has MetaTemplateId but no TwilioContentSid
+    /// This is useful when templates were created directly on Meta/Twilio console
+    /// </summary>
+    public async Task<bool> SyncContentSidFromMetaAsync(int templateId)
+    {
+        try
+        {
+            var template = await _db.Templates.FindAsync(templateId);
+            if (template == null)
+            {
+                _logger.LogWarning("Template {TemplateId} not found", templateId);
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(template.MetaTemplateId))
+            {
+                _logger.LogWarning("Template {TemplateId} has no MetaTemplateId", templateId);
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(template.TwilioContentSid))
+            {
+                _logger.LogInformation("Template {TemplateId} already has TwilioContentSid: {ContentSid}", 
+                    templateId, template.TwilioContentSid);
+                return true;
+            }
+
+            // The MetaTemplateId IS the ContentSid in Twilio's system
+            // Map MetaTemplateId to TwilioContentSid
+            template.TwilioContentSid = template.MetaTemplateId;
+            template.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Synced ContentSid from MetaTemplateId for template {TemplateId}. ContentSid: {ContentSid}", 
+                templateId, template.TwilioContentSid);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing ContentSid from Meta for template {TemplateId}", templateId);
             return false;
         }
     }

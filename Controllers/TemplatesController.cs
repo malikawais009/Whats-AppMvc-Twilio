@@ -221,6 +221,45 @@ public class TemplatesController : Controller
     }
 
     /// <summary>
+    /// Sync ContentSid from Meta for a template
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> SyncContentSid(int templateId)
+    {
+        try
+        {
+            var template = await _templateService.GetTemplateByIdAsync(templateId);
+            if (template == null)
+            {
+                TempData["Error"] = "Template not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrEmpty(template.MetaTemplateId))
+            {
+                TempData["Error"] = "Template does not have a MetaTemplateId. Please create the template on Twilio first.";
+                return RedirectToAction(nameof(Details), new { id = templateId });
+            }
+
+            var result = await _twilioTemplateService.SyncContentSidFromMetaAsync(templateId);
+            if (result)
+            {
+                TempData["Success"] = "ContentSid synced from Meta successfully.";
+            }
+            else
+            {
+                TempData["Error"] = "Failed to sync ContentSid. The template may still be pending approval on Meta.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Failed to sync ContentSid: {ex.Message}";
+        }
+
+        return RedirectToAction(nameof(Details), new { id = templateId });
+    }
+
+    /// <summary>
     /// Submit template for approval
     /// </summary>
     [HttpPost]
@@ -441,6 +480,49 @@ public class TemplatesController : Controller
         catch (Exception ex)
         {
             TempData["Error"] = $"Failed to delete template: {ex.Message}";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Bulk sync all approved templates from Twilio/Meta
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> BulkSyncFromMeta()
+    {
+        try
+        {
+            var approvedTemplates = await _templateService.GetApprovedTemplatesAsync();
+            var syncedCount = 0;
+            var failedCount = 0;
+
+            foreach (var template in approvedTemplates)
+            {
+                try
+                {
+                    var result = await _twilioTemplateService.SyncTemplateStatusAsync(template.Id);
+                    if (result)
+                    {
+                        syncedCount++;
+                    }
+                    else
+                    {
+                        failedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to sync template {TemplateId}", template.Id);
+                    failedCount++;
+                }
+            }
+
+            TempData["Success"] = $"Bulk sync completed. Synced: {syncedCount}, Failed: {failedCount}";
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Failed to bulk sync templates: {ex.Message}";
         }
 
         return RedirectToAction(nameof(Index));
