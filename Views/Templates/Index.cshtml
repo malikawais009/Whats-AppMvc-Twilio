@@ -15,9 +15,14 @@
             </ol>
         </nav>
     </div>
-    <a asp-action="Create" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>Create Template
-    </a>
+    <div>
+        <a asp-action="NeedsSync" class="btn btn-outline-warning me-2">
+            <i class="bi bi-arrow-repeat me-1"></i>Needs Sync
+        </a>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Create Template
+        </a>
+    </div>
 </div>
 
 @if (TempData["Success"] != null)
@@ -37,7 +42,7 @@
 
 <!-- Stats Cards -->
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <a asp-action="Index" class="text-decoration-none">
             <div class="card text-center h-100 py-3">
                 <div class="card-body">
@@ -47,8 +52,8 @@
             </div>
         </a>
     </div>
-    <div class="col-md-4">
-        <a asp-action="Index" asp-route-status="Approved" class="text-decoration-none">
+    <div class="col-md-3">
+        <a asp-action="ApprovedTemplates" class="text-decoration-none">
             <div class="card text-center h-100 py-3 border-success">
                 <div class="card-body">
                     <h3 class="mb-0 text-success">@Model.Count(t => t.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved)</h3>
@@ -57,12 +62,22 @@
             </div>
         </a>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <a asp-action="PendingApproval" class="text-decoration-none">
             <div class="card text-center h-100 py-3 border-warning">
                 <div class="card-body">
                     <h3 class="mb-0 text-warning">@Model.Count(t => t.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending)</h3>
-                    <small class="text-muted">Pending Approval</small>
+                    <small class="text-muted">Pending</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a asp-action="Index" asp-route-status="Draft" class="text-decoration-none">
+            <div class="card text-center h-100 py-3 border-secondary">
+                <div class="card-body">
+                    <h3 class="mb-0 text-secondary">@Model.Count(t => t.Status == WhatsAppMvcComplete.Models.TemplateStatus.Draft)</h3>
+                    <small class="text-muted">Draft</small>
                 </div>
             </div>
         </a>
@@ -77,6 +92,7 @@
                 <label class="form-label small">Status Filter</label>
                 <select name="status" class="form-select">
                     <option value="">All Templates</option>
+                    <option value="Draft" selected="@(ViewBag.StatusFilter == "Draft")">Draft</option>
                     <option value="Pending" selected="@(ViewBag.StatusFilter == "Pending")">Pending</option>
                     <option value="Approved" selected="@(ViewBag.StatusFilter == "Approved")">Approved</option>
                     <option value="Rejected" selected="@(ViewBag.StatusFilter == "Rejected")">Rejected</option>
@@ -100,6 +116,11 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list me-2"></i>All Templates (@Model.Count())</span>
+        <form asp-action="BulkSyncFromMeta" method="post" class="d-inline">
+            <button type="submit" class="btn btn-outline-primary btn-sm" onclick="return confirm('Sync all approved templates from Meta? This will update statuses based on Meta API.');">
+                <i class="bi bi-cloud-arrow-down me-1"></i>Sync All from Meta
+            </button>
+        </form>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -110,6 +131,8 @@
                         <th><i class="bi bi-card-text me-1"></i>Name</th>
                         <th><i class="bi bi-chat me-1"></i>Channel</th>
                         <th><i class="bi bi-info-circle me-1"></i>Status</th>
+                        <th><i class="bi bi-cloud me-1"></i>Meta Status</th>
+                        <th><i class="bi bi-gear me-1"></i>ContentSid</th>
                         <th><i class="bi bi-person me-1"></i>Created By</th>
                         <th><i class="bi bi-calendar me-1"></i>Created</th>
                         <th><i class="bi bi-gear me-1"></i>Actions</th>
@@ -120,38 +143,93 @@
                     {
                         <tr>
                             <td><strong>#@template.Id</strong></td>
-                            <td>@template.Name</td>
+                            <td>
+                                <a asp-action="Details" asp-route-id="@template.Id" class="text-decoration-none">
+                                    <strong>@template.Name</strong>
+                                </a>
+                            </td>
                             <td>
                                 <span class="badge bg-primary">
                                     <i class="bi bi-whatsapp me-1"></i>@template.Channel
                                 </span>
                             </td>
                             <td>
-                                <span class="badge @(template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : "bg-warning")">
+                                <span class="badge @(template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending ? "bg-warning" : "bg-secondary")">
                                     @template.Status
                                 </span>
                             </td>
-                            <td>@(template.CreatedBy ?? "System")</td>
-                            <td><small>@template.CreatedAt.ToString("MMM dd, yyyy")</small></td>
                             <td>
-                                <a asp-action="Details" asp-route-id="@template.Id" class="btn btn-sm btn-outline-primary" title="View">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                @if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending)
+                                @if (!string.IsNullOrEmpty(template.MetaTemplateId))
                                 {
-                                    <form asp-action="RequestApproval" asp-route-templateId="@template.Id" method="post" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Request Approval">
-                                            <i class="bi bi-send-check"></i>
-                                        </button>
-                                    </form>
+                                    <span class="badge bg-info" title="@template.MetaTemplateId">
+                                        <i class="bi bi-check-circle me-1"></i>Submitted
+                                    </span>
                                 }
+                                else if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved)
+                                {
+                                    <span class="badge bg-warning text-dark" title="Not submitted to Meta">
+                                        <i class="bi bi-exclamation-circle me-1"></i>Pending
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary" title="Awaiting local approval">
+                                        <i class="bi bi-clock me-1"></i>Local
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(template.TwilioContentSid))
+                                {
+                                    <span class="badge bg-success" title="@template.TwilioContentSid">
+                                        <i class="bi bi-check-circle me-1"></i>Set
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark" title="ContentSid not configured">
+                                        <i class="bi bi-exclamation-circle me-1"></i>Not Set
+                                    </span>
+                                }
+                            </td>
+                            <td><small>@(template.CreatedBy ?? "System")</small></td>
+                            <td><small>@template.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small></td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a asp-action="Details" asp-route-id="@template.Id" class="btn btn-outline-primary" title="View">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    @if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Draft)
+                                    {
+                                        <a asp-action="Edit" asp-route-id="@template.Id" class="btn btn-outline-secondary" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    }
+                                    @if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending)
+                                    {
+                                        <form asp-action="Approve" asp-route-templateId="@template.Id" method="post" class="d-inline">
+                                            <button type="submit" class="btn btn-outline-success" title="Approve" onclick="return confirm('Are you sure you want to approve this template?');">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </form>
+                                        <a asp-action="Reject" asp-route-templateId="@template.Id" class="btn btn-outline-danger" title="Reject">
+                                            <i class="bi bi-x-lg"></i>
+                                        </a>
+                                    }
+                                    @if (template.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved && string.IsNullOrEmpty(template.TwilioContentSid))
+                                    {
+                                        <a asp-action="UpdateContentSid" asp-route-id="@template.Id" class="btn btn-outline-warning" title="Add ContentSid">
+                                            <i class="bi bi-link"></i>
+                                        </a>
+                                    }
+                                </div>
                             </td>
                         </tr>
                     }
                     @if (!Model.Any())
                     {
                         <tr>
-                            <td colspan="7" class="text-center py-5">
+                            <td colspan="9" class="text-center py-5">
                                 <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
                                 <p class="text-muted mt-3">No templates found</p>
                                 <a asp-action="Create" class="btn btn-primary">
@@ -162,6 +240,41 @@
                     }
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Template Guidelines -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-book me-2"></i>Template Guidelines
+            </div>
+            <div class="card-body">
+                <h6>Best Practices</h6>
+                <ul class="mb-0 small">
+                    <li class="mb-2">Use <code>{{parameter}}</code> syntax for dynamic values</li>
+                    <li class="mb-2">Keep templates concise and clear</li>
+                    <li class="mb-2">Templates must be approved before sending</li>
+                    <li class="mb-2">Add ContentSid after Meta approval for production</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>Meta Approval Process
+            </div>
+            <div class="card-body">
+                <ol class="mb-0 small">
+                    <li class="mb-2">Create template in your app</li>
+                    <li class="mb-2">Submit for approval in Meta Business Manager</li>
+                    <li class="mb-2">Wait for Meta review (24-48 hours)</li>
+                    <li class="mb-2">Once approved, add ContentSid from Twilio Console</li>
+                </ol>
+            </div>
         </div>
     </div>
 </div>

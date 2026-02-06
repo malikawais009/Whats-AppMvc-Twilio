@@ -1,0 +1,142 @@
+@model IEnumerable<WhatsAppMvcComplete.Models.Template>
+
+@{
+    ViewData["Title"] = "Templates Needing Sync";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-arrow-repeat"></i> Templates Needing Sync</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="/Templates">Templates</a></li>
+                <li class="breadcrumb-item active">Needs Sync</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>What is ContentSid?</strong>
+    <p class="mb-0 mt-2">
+        ContentSid is a Twilio identifier that links your approved template to Twilio's Content API.
+        Without ContentSid, template messages cannot be sent. Get it from Twilio Console after Meta approval.
+    </p>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+            <h3 class="mt-3">All Synced!</h3>
+            <p class="text-muted">All approved templates have ContentSid configured.</p>
+            <a asp-action="Index" class="btn btn-primary">
+                <i class="bi bi-arrow-left me-2"></i>Back to Templates
+            </a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Templates Without ContentSid (@Model.Count())
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th><i class="bi bi-hash me-1"></i>ID</th>
+                            <th><i class="bi bi-card-text me-1"></i>Name</th>
+                            <th><i class="bi bi-chat me-1"></i>Template Text</th>
+                            <th><i class="bi bi-info-circle me-1"></i>Status</th>
+                            <th><i class="bi bi-calendar me-1"></i>Approved</th>
+                            <th><i class="bi bi-gear me-1"></i>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var template in Model)
+                        {
+                            <tr>
+                                <td><strong>#@template.Id</strong></td>
+                                <td>
+                                    <a asp-action="Details" asp-route-id="@template.Id" class="text-decoration-none">
+                                        <strong>@template.Name</strong>
+                                    </a>
+                                </td>
+                                <td style="max-width: 300px;">
+                                    <div class="text-truncate" title="@template.TemplateText">@template.TemplateText</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">Approved</span>
+                                </td>
+                                <td><small>@(template.ApprovedAt?.ToString("MMM dd, yyyy") ?? "N/A")</small></td>
+                                <td>
+                                    <a asp-action="UpdateContentSid" asp-route-id="@template.Id" class="btn btn-warning btn-sm">
+                                        <i class="bi bi-link me-1"></i>Add ContentSid
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-question-circle me-2"></i>How to Get ContentSid
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li class="mb-2">Ensure your template is approved by Meta in Business Manager</li>
+                        <li class="mb-2">Go to <a href="https://console.twilio.com/usm/develop/messaging/content-templates" target="_blank">Twilio Console</a></li>
+                        <li class="mb-2">Navigate to Messaging > WhatsApp > Content Templates</li>
+                        <li class="mb-2">Find your approved template</li>
+                        <li class="mb-2">Copy the Content SID (starts with HX...)</li>
+                        <li>Click "Add ContentSid" and paste it here</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-info-circle me-2"></i>Why This is Needed
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li class="mb-2">Required for sending template messages via WhatsApp</li>
+                        <li class="mb-2">Links your template to Twilio's Content API</li>
+                        <li class="mb-2">Enables proper parameter substitution</li>
+                        <li class="mb-2">Ensures compliance with Meta/Twilio requirements</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+}

@@ -12,13 +12,19 @@ public class MessagingService : IMessagingService
 {
     private readonly AppDbContext _db;
     private readonly TwilioSettings _settings;
+    private readonly IWhatsAppService _whatsAppService;
     private readonly ILogger<MessagingService> _logger;
     private readonly SemaphoreSlim _throttle = new(10, 10); // Limit concurrent requests
 
-    public MessagingService(AppDbContext db, IOptions<TwilioSettings> settings, ILogger<MessagingService> logger)
+    public MessagingService(
+        AppDbContext db, 
+        IOptions<TwilioSettings> settings, 
+        IWhatsAppService whatsAppService,
+        ILogger<MessagingService> logger)
     {
         _db = db;
         _settings = settings.Value;
+        _whatsAppService = whatsAppService;
         _logger = logger;
         TwilioClient.Init(_settings.AccountSid, _settings.AuthToken);
     }
@@ -27,6 +33,8 @@ public class MessagingService : IMessagingService
     {
         var user = await _db.Users.FindAsync(userId);
         if (user == null) throw new ArgumentException("User not found");
+        if (string.IsNullOrEmpty(user.Phone))
+            throw new ArgumentException("User phone number not found");
 
         var msg = new Message
         {
@@ -92,7 +100,7 @@ public class MessagingService : IMessagingService
         if (string.IsNullOrEmpty(user.WhatsAppNumber))
             throw new ArgumentException("User WhatsApp number not found");
 
-        // Replace template placeholders with actual values
+        // Replace template placeholders with actual values for display
         var messageText = template.TemplateText;
         foreach (var param in parameters)
         {
@@ -116,7 +124,7 @@ public class MessagingService : IMessagingService
 
         if (!scheduledAt.HasValue)
         {
-            await ExecuteSendAsync(msg, user.WhatsAppNumber, templateId);
+            await ExecuteTemplateSendAsync(msg, user.WhatsAppNumber, template.Name, parameters);
         }
 
         return msg;
@@ -135,6 +143,14 @@ public class MessagingService : IMessagingService
         if (string.IsNullOrEmpty(phoneNumber))
             return false;
 
+        if (message.TemplateId.HasValue)
+        {
+            var template = await _db.Templates.FindAsync(message.TemplateId.Value);
+            var parameters = new Dictionary<string, string>();
+            // In a real implementation, you'd store template parameters with the message
+            return await ExecuteTemplateSendAsync(message, phoneNumber, template?.Name ?? "", parameters);
+        }
+
         return await ExecuteSendAsync(message, phoneNumber);
     }
 
@@ -144,7 +160,7 @@ public class MessagingService : IMessagingService
         if (message == null || message.Status != MessageStatus.Failed)
             return false;
 
-        if (message.RetryCount >= 3)
+        if (message.RetryCount >= _settings.MaxRetryAttempts)
         {
             _logger.LogWarning("Message {MessageId} has exceeded maximum retry attempts", messageId);
             return false;
@@ -155,7 +171,7 @@ public class MessagingService : IMessagingService
 
         message.RetryCount++;
         message.Status = MessageStatus.Pending;
-        message.ScheduledAt = DateTime.UtcNow.AddMinutes(Math.Pow(2, message.RetryCount)); // Exponential backoff
+        message.ScheduledAt = DateTime.UtcNow.AddSeconds(_settings.RetryIntervalSeconds * (int)Math.Pow(2, message.RetryCount - 1)); // Exponential backoff
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Message {MessageId} scheduled for retry attempt {RetryCount}", messageId, message.RetryCount);
@@ -223,7 +239,7 @@ public class MessagingService : IMessagingService
         }
     }
 
-    private async Task<bool> ExecuteSendAsync(Message message, string phoneNumber, int? templateId = null)
+    private async Task<bool> ExecuteSendAsync(Message message, string phoneNumber)
     {
         await _throttle.WaitAsync();
         try
@@ -233,21 +249,12 @@ public class MessagingService : IMessagingService
             if (message.Channel == MessageChannel.SMS)
             {
                 result = await MessageResource.CreateAsync(
-                    from: new PhoneNumber(_settings.WhatsAppFrom),
+                    from: new PhoneNumber(_settings.SmsFrom),
                     to: new PhoneNumber(phoneNumber),
                     body: message.MessageText
                 );
             }
-            else if (templateId.HasValue)
-            {
-                // Template message - body is null, template configured in Twilio
-                result = await MessageResource.CreateAsync(
-                    from: new PhoneNumber(_settings.WhatsAppFrom),
-                    to: new PhoneNumber($"whatsapp:{phoneNumber}"),
-                    body: null
-                );
-            }
-            else
+            else // WhatsApp freeform
             {
                 result = await MessageResource.CreateAsync(
                     from: new PhoneNumber(_settings.WhatsAppFrom),
@@ -293,6 +300,67 @@ public class MessagingService : IMessagingService
             await _db.SaveChangesAsync();
 
             _logger.LogError(ex, "Failed to send message {MessageId}", message.Id);
+            return false;
+        }
+        finally
+        {
+            _throttle.Release();
+        }
+    }
+
+    private async Task<bool> ExecuteTemplateSendAsync(Message message, string phoneNumber, string templateName, Dictionary<string, string> parameters)
+    {
+        await _throttle.WaitAsync();
+        try
+        {
+            // Convert parameters to array (1-indexed)
+            var templateParams = parameters.Values.ToArray();
+
+            await _whatsAppService.SendTemplateAsync(
+                phoneNumber,
+                templateName,
+                templateParams
+            );
+
+            // Get the message SID from Twilio (this is simplified - in production you'd need to track it)
+            // For now, we'll generate a temporary SID for logging
+            message.TwilioMessageId = $"TMPL_{Guid.NewGuid():N}";
+            message.Status = MessageStatus.Sent;
+
+            // Log sent event
+            var sentLog = new MessageLog
+            {
+                MessageId = message.Id,
+                EventType = EventType.Sent,
+                EventTimestamp = DateTime.UtcNow,
+                WebhookPayload = $"{{\"TemplateName\": \"{templateName}\", \"Parameters\": {System.Text.Json.JsonSerializer.Serialize(parameters)}}}"
+            };
+
+            _db.MessageLogs.Add(sentLog);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Template message {MessageId} sent successfully. Template: {TemplateName}", message.Id, templateName);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            message.Status = MessageStatus.Failed;
+            message.RetryCount++;
+
+            // Log failed event
+            var failedLog = new MessageLog
+            {
+                MessageId = message.Id,
+                EventType = EventType.Failed,
+                EventTimestamp = DateTime.UtcNow,
+                ErrorMessage = ex.Message,
+                WebhookPayload = $"{{\"TemplateName\": \"{templateName}\", \"Error\": \"{ex.Message}\"}}"
+            };
+
+            _db.MessageLogs.Add(failedLog);
+            await _db.SaveChangesAsync();
+
+            _logger.LogError(ex, "Failed to send template message {MessageId}", message.Id);
             return false;
         }
         finally

@@ -21,9 +21,17 @@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Template Details</span>
-                <span class="badge @(Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : "bg-warning")">
-                    @Model.Status
-                </span>
+                <div>
+                    <span class="badge @(Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : "bg-warning")">
+                        @Model.Status
+                    </span>
+                    @if (!string.IsNullOrEmpty(Model.MetaTemplateId))
+                    {
+                        <span class="badge bg-info ms-1" title="Submitted to Meta">
+                            <i class="bi bi-cloud-check"></i> Meta
+                        </span>
+                    }
+                </div>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
@@ -37,6 +45,31 @@
                 <div class="row mb-3">
                     <div class="col-md-3 fw-bold">Channel:</div>
                     <div class="col-md-9">@Model.Channel</div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.Language))
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Language:</div>
+                        <div class="col-md-9">@Model.Language</div>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.MetaTemplateId))
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Meta Template ID:</div>
+                        <div class="col-md-9"><code>@Model.MetaTemplateId</code></div>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.TwilioContentSid))
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Twilio ContentSid:</div>
+                        <div class="col-md-9"><code>@Model.TwilioContentSid</code></div>
+                    </div>
+                }
+                <div class="row mb-3">
+                    <div class="col-md-3 fw-bold">Category:</div>
+                    <div class="col-md-9">@Model.Category</div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-md-3 fw-bold">Created:</div>
@@ -101,6 +134,65 @@
     </div>
 
     <div class="col-md-4">
+        <!-- Meta Sync Status Card -->
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-cloud-arrow-up"></i> Meta Integration
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Model.MetaTemplateId))
+                {
+                    <div class="alert alert-success py-2 mb-2">
+                        <small><i class="bi bi-check-circle"></i> Submitted to Meta</small>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">Meta Template ID:</small><br>
+                        <code class="small">@Model.MetaTemplateId</code>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Model.TwilioContentSid))
+                    {
+                        <div class="alert alert-info py-2 mb-2">
+                            <small><i class="bi bi-check-circle"></i> ContentSid synced</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning py-2 mb-2">
+                            <small><i class="bi bi-exclamation-triangle"></i> ContentSid not synced</small>
+                        </div>
+                    }
+                    <form asp-action="SyncFromMeta" asp-route-templateId="@Model.Id" method="post">
+                        <button type="submit" class="btn btn-outline-primary btn-sm w-100 mb-2">
+                            <i class="bi bi-arrow-repeat"></i> Sync Status from Meta
+                        </button>
+                    </form>
+                    <form asp-action="SyncContentSid" asp-route-templateId="@Model.Id" method="post">
+                        <button type="submit" class="btn btn-outline-info btn-sm w-100">
+                            <i class="bi bi-download"></i> Sync ContentSid
+                        </button>
+                    </form>
+                }
+                else if (Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved)
+                {
+                    <div class="alert alert-info py-2 mb-2">
+                        <small><i class="bi bi-info-circle"></i> Ready for Meta submission</small>
+                    </div>
+                    <form asp-action="SubmitToMeta" asp-route-templateId="@Model.Id" method="post">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-send"></i> Submit to Meta
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <div class="alert alert-secondary py-2 mb-0">
+                        <small><i class="bi bi-info-circle"></i> Approve locally before submitting to Meta</small>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Actions Card -->
         <div class="card mb-4">
             <div class="card-header">Actions</div>
             <div class="card-body">
@@ -116,6 +208,9 @@
                     <a asp-controller="Messages" asp-action="Compose" class="btn btn-success w-100 mb-2">
                         <i class="bi bi-send"></i> Use This Template
                     </a>
+                    <a asp-action="UpdateContentSid" asp-route-id="@Model.Id" class="btn btn-outline-primary w-100 mb-2">
+                        <i class="bi bi-pencil"></i> Update ContentSid
+                    </a>
                 }
                 else if (Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected)
                 {
@@ -126,6 +221,7 @@
             </div>
         </div>
 
+        <!-- Usage Statistics Card -->
         <div class="card">
             <div class="card-header">Usage Statistics</div>
             <div class="card-body">

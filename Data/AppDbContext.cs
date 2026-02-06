@@ -19,6 +19,20 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // User configuration
+        modelBuilder.Entity<User>()
+            .HasMany(u => u.Messages)
+            .WithOne(m => m.User)
+            .HasForeignKey(m => m.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Conversation configuration
+        modelBuilder.Entity<Conversation>()
+            .HasMany(c => c.Messages)
+            .WithOne(m => m.Conversation)
+            .HasForeignKey(m => m.ConversationId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Message configuration
         modelBuilder.Entity<Message>()
             .HasOne(m => m.User)
@@ -52,11 +66,31 @@ public class AppDbContext : DbContext
             .HasForeignKey(tr => tr.TemplateId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // User configuration
-        modelBuilder.Entity<User>()
-            .HasMany(u => u.Messages)
-            .WithOne(m => m.User)
-            .HasForeignKey(m => m.UserId)
+        modelBuilder.Entity<Template>()
+            .HasMany(t => t.Messages)
+            .WithOne(m => m.Template)
+            .HasForeignKey(m => m.TemplateId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Enum conversions
+        modelBuilder.Entity<Message>()
+            .Property(m => m.Channel)
+            .HasConversion<int>();
+
+        modelBuilder.Entity<Message>()
+            .Property(m => m.Status)
+            .HasConversion<int>();
+
+        modelBuilder.Entity<Template>()
+            .Property(t => t.Status)
+            .HasConversion<int>();
+
+        modelBuilder.Entity<MessageLog>()
+            .Property(ml => ml.EventType)
+            .HasConversion<int>();
+
+        modelBuilder.Entity<TemplateRequest>()
+            .Property(tr => tr.Status)
+            .HasConversion<int>();
     }
 }

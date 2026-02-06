@@ -3,15 +3,17 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="page-header">
-    <h1>Create New Template</h1>
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="/Templates">Templates</a></li>
-            <li class="breadcrumb-item active">Create</li>
-        </ol>
-    </nav>
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-plus-circle"></i> Create New Template</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="/Templates">Templates</a></li>
+                <li class="breadcrumb-item active">Create</li>
+            </ol>
+        </nav>
+    </div>
 </div>
 
 @if (TempData["Error"] != null)
@@ -25,28 +27,73 @@
 <div class="row">
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header">Template Details</div>
+            <div class="card-header">
+                <i class="bi bi-card-text me-2"></i>Template Details
+            </div>
             <div class="card-body">
                 <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+                    
                     <div class="mb-3">
                         <label class="form-label">Template Name</label>
                         <input type="text" name="name" class="form-control" required 
-                               placeholder="e.g., welcome_message, order_confirmation">
+                               placeholder="e.g., welcome_message, order_confirmation"
+                               pattern="[a-z0-9_]+"
+                               title="Lowercase letters, numbers, and underscores only">
+                        <small class="text-muted">Use lowercase with underscores (e.g., welcome_message)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select name="category" class="form-select">
+                            <option value="MARKETING">Marketing</option>
+                            <option value="TRANSACTIONAL">Transactional</option>
+                            <option value="OTP">One-Time Password</option>
+                            <option value="SUPPORT">Customer Support</option>
+                        </select>
+                        <small class="text-muted">Template category as defined by Meta</small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Template Text</label>
-                        <textarea name="templateText" class="form-control" rows="6" required
-                                  placeholder="Enter your template. Use {{parameter_name}} for placeholders."></textarea>
+                        <textarea name="templateText" id="templateText" class="form-control" rows="6" required
+                                  placeholder="Enter your template. Use {{parameter_name}} for placeholders."
+                                  oninput="updatePreview()"></textarea>
                         <small class="text-muted">
-                            Use {{param_name}} syntax for dynamic parameters.<br>
-                            Example: "Hello {{name}}, your order {{order_id}} has been confirmed."
+                            Use <code>{{param_name}}</code> syntax for dynamic parameters.<br>
+                            Example: "Hello <code>{{name}}</code>, your order <code>{{order_id}}</code> has been confirmed."
                         </small>
                     </div>
 
+                    <!-- Live Preview -->
+                    <div class="card bg-light mb-3">
+                        <div class="card-header">
+                            <i class="bi bi-eye me-2"></i>Live Preview
+                        </div>
+                        <div class="card-body">
+                            <div id="previewContent" class="p-3 bg-white rounded border">
+                                <p class="mb-0 text-muted">Start typing to see preview...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Parameters Preview -->
+                    <div class="card bg-info-subtle mb-3" id="paramsCard" style="display: none;">
+                        <div class="card-header">
+                            <i class="bi bi-gear me-2"></i>Detected Parameters
+                        </div>
+                        <div class="card-body">
+                            <div id="paramsList" class="row"></div>
+                        </div>
+                    </div>
+
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">Create Template</button>
-                        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>Create Template
+                        </button>
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-2"></i>Cancel
+                        </a>
                     </div>
                 </form>
             </div>
@@ -54,26 +101,78 @@
     </div>
 
     <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">Template Guidelines</div>
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="bi bi-book me-2"></i>Guidelines
+            </div>
             <div class="card-body">
-                <h5>Best Practices</h5>
-                <ul>
-                    <li>Use clear, descriptive names</li>
-                    <li>Keep templates concise</li>
-                    <li>Use {{brackets}} for parameters</li>
-                    <li>Templates must be approved before use</li>
-                    <li>WhatsApp templates are reviewed by Meta</li>
+                <h6>Best Practices</h6>
+                <ul class="small">
+                    <li class="mb-2">Use clear, descriptive names</li>
+                    <li class="mb-2">Keep templates concise (max 1024 chars)</li>
+                    <li class="mb-2">Use <code>{{brackets}}</code> for parameters</li>
+                    <li class="mb-2">Templates must be approved before use</li>
                 </ul>
                 <hr>
-                <h5>WhatsApp Requirements</h5>
-                <ul>
-                    <li>Must follow Meta's template guidelines</li>
-                    <li>No promotional content without permission</li>
-                    <li>Must include opt-out option</li>
-                    <li>Response time: 24-48 hours</li>
+                <h6>WhatsApp Requirements</h6>
+                <ul class="small">
+                    <li class="mb-2">Must follow Meta's template guidelines</li>
+                    <li class="mb-2">No promotional content without permission</li>
+                    <li class="mb-2">Must include opt-out option</li>
+                    <li class="mb-2">Response time: 24-48 hours</li>
                 </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-check-circle me-2"></i>Approval Process
+            </div>
+            <div class="card-body">
+                <ol class="small mb-0">
+                    <li class="mb-2">Create template (saved as Draft)</li>
+                    <li class="mb-2">Submit for admin approval</li>
+                    <li class="mb-2">Admin reviews and approves</li>
+                    <li class="mb-2">Template becomes ready to use</li>
+                    <li class="mb-2">Add ContentSid for production</li>
+                </ol>
             </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        function updatePreview() {
+            const text = document.getElementById('templateText').value;
+            const preview = document.getElementById('previewContent');
+            const paramsCard = document.getElementById('paramsCard');
+            const paramsList = document.getElementById('paramsList');
+
+            // Update preview
+            if (text.trim()) {
+                let formatted = text.replace(/\{\{(\w+)\}\}/g, '<strong style="color: #0d6efd;">[$1]</strong>');
+                preview.innerHTML = '<p class="mb-0">' + formatted + '</p>';
+            } else {
+                preview.innerHTML = '<p class="mb-0 text-muted">Start typing to see preview...</p>';
+            }
+
+            // Extract parameters
+            const paramRegex = /\{\{(\w+)\}\}/g;
+            const matches = [...text.matchAll(paramRegex)];
+            const params = [...new Set(matches.map(m => m[1]))];
+
+            if (params.length > 0) {
+                paramsCard.style.display = 'block';
+                paramsList.innerHTML = params.map(param => 
+                    '<div class="col-md-6 mb-2"><div class="badge bg-primary">' + param + '</div></div>'
+                ).join('');
+            } else {
+                paramsCard.style.display = 'none';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', updatePreview);
+    </script>
+}

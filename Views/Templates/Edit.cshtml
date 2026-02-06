@@ -1,0 +1,139 @@
+@model WhatsAppMvcComplete.Models.Template
+
+@{
+    ViewData["Title"] = "Edit Template";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1><i class="bi bi-pencil"></i> Edit Template</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Templates">Templates</a></li>
+            <li class="breadcrumb-item"><a href="/Templates/Details/@Model.Id">@Model.Name</a></li>
+            <li class="breadcrumb-item active">Edit</li>
+        </ol>
+    </nav>
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-card-text me-2"></i>Template Details
+            </div>
+            <div class="card-body">
+                <form asp-action="Edit" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" name="name" class="form-control" required 
+                               value="@Model.Name"
+                               pattern="[a-z0-9_]+"
+                               title="Lowercase letters, numbers, and underscores only">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Template Text</label>
+                        <textarea name="templateText" id="templateText" class="form-control" rows="6" required
+                                  oninput="updatePreview()">@Model.TemplateText</textarea>
+                        <small class="text-muted">
+                            Use <code>{{param_name}}</code> syntax for dynamic parameters.
+                        </small>
+                    </div>
+
+                    <!-- Live Preview -->
+                    <div class="card bg-light mb-3">
+                        <div class="card-header">
+                            <i class="bi bi-eye me-2"></i>Live Preview
+                        </div>
+                        <div class="card-body">
+                            <div id="previewContent" class="p-3 bg-white rounded border">
+                                @Html.Raw(Model.TemplateText.Replace("{{", "<strong style='color: #0d6efd;'>[").Replace("}}", "]</strong>"))
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Warning:</strong> Editing an approved template will reset its status to Pending.
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>Save Changes
+                        </button>
+                        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-2"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>Current Status
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="text-muted small">Status</label>
+                    <div>
+                        <span class="badge @(Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Approved ? "bg-success" : Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Pending ? "bg-warning" : Model.Status == WhatsAppMvcComplete.Models.TemplateStatus.Rejected ? "bg-danger" : "bg-secondary")">
+                            @Model.Status
+                        </span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Created By</label>
+                    <div>@(Model.CreatedBy ?? "System")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Created At</label>
+                    <div>@Model.CreatedAt.ToString("MMM dd, yyyy HH:mm")</div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.TwilioContentSid))
+                {
+                    <div class="mb-3">
+                        <label class="text-muted small">Twilio ContentSid</label>
+                        <div><code>@Model.TwilioContentSid</code></div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function updatePreview() {
+            const text = document.getElementById('templateText').value;
+            const preview = document.getElementById('previewContent');
+            
+            if (text.trim()) {
+                let formatted = text.replace(/\{\{(\w+)\}\}/g, '<strong style="color: #0d6efd;">[$1]</strong>');
+                preview.innerHTML = '<p class="mb-0">' + formatted + '</p>';
+            } else {
+                preview.innerHTML = '<p class="mb-0 text-muted">Start typing...</p>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', updatePreview);
+    </script>
+}

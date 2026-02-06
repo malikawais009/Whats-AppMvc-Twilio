@@ -1,0 +1,130 @@
+@{
+    ViewData["Title"] = "Update ContentSid";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <h1><i class="bi bi-link"></i> Update Twilio ContentSid</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/Templates">Templates</a></li>
+            <li class="breadcrumb-item"><a href="/Templates/Details/@ViewBag.Template?.Id">@ViewBag.Template?.Name</a></li>
+            <li class="breadcrumb-item active">ContentSid</li>
+        </ol>
+    </nav>
+</div>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-link-45deg me-2"></i>Configure Twilio ContentSid
+            </div>
+            <div class="card-body">
+                <form asp-action="UpdateContentSid" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@ViewBag.Template?.Id" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" class="form-control" value="@ViewBag.Template?.Name" disabled />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Template Text</label>
+                        <textarea class="form-control" rows="3" disabled>@ViewBag.Template?.TemplateText</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Twilio ContentSid</label>
+                        <input type="text" name="contentSid" class="form-control" 
+                               placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                               pattern="HX[a-zA-Z0-9]+"
+                               title="ContentSid starts with HX followed by alphanumeric characters" />
+                        <small class="text-muted">
+                            The Content SID from Twilio Console (starts with HX)<br>
+                            Get this from: Twilio Console → Messaging → WhatsApp → Content Templates
+                        </small>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>How to get ContentSid:</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Go to <a href="https://console.twilio.com/usm/develop/messaging/content-templates" target="_blank">Twilio Console</a></li>
+                            <li>Find your approved template in Meta Business Manager</li>
+                            <li>Copy the Content SID (starts with HX...)</li>
+                            <li>Paste it here</li>
+                        </ol>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>Update ContentSid
+                        </button>
+                        <a asp-action="Details" asp-route-id="@ViewBag.Template?.Id" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-2"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>Template Info
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="text-muted small">Status</label>
+                    <div>
+                        @if (ViewBag.Template != null)
+                        {
+                            <span class="badge bg-success">Approved</span>
+                        }
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(ViewBag.Template?.TwilioContentSid))
+                {
+                    <div class="mb-3">
+                        <label class="text-muted small">Current ContentSid</label>
+                        <div><code>@ViewBag.Template.TwilioContentSid</code></div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="bi bi-question-circle me-2"></i>Why is this needed?
+            </div>
+            <div class="card-body">
+                <p class="small mb-2">The ContentSid links your template to Twilio's Content API, enabling:</p>
+                <ul class="small mb-0">
+                    <li>Template message delivery via WhatsApp</li>
+                    <li>Proper parameter substitution</li>
+                    <li>Delivery and status tracking</li>
+                    <li>Compliance with Meta/Twilio requirements</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

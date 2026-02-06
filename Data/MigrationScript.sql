@@ -1,6 +1,7 @@
 -- WhatsAppMvcComplete Database Schema
 -- SQL Server Database Migration Script
 -- Run this script in SQL Server Management Studio or via sqlcmd
+-- Updated: February 2024 - Includes all new fields for Meta/Twilio integration
 
 USE WhatsAppTwilioDb;
 GO
@@ -31,10 +32,24 @@ CREATE TABLE Templates (
     Name NVARCHAR(100) NOT NULL,
     Channel INT NOT NULL DEFAULT 1,
     TemplateText NVARCHAR(MAX) NOT NULL,
-    Status INT NOT NULL DEFAULT 0,
-    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    Status INT NOT NULL DEFAULT -1,  -- -1=Draft, 0=Pending, 1=Approved, 2=Rejected, 3=Archived
+    
+    -- Meta/Twilio Integration Fields
+    MetaTemplateId NVARCHAR(100) NULL,      -- Meta Business Manager Template ID
+    TwilioContentSid NVARCHAR(100) NULL,    -- Twilio Content SID (HX...)
+    Language NVARCHAR(10) NULL DEFAULT 'en_US',
+    Category NVARCHAR(50) NULL,              -- MARKETING, TRANSACTIONAL, OTP, SUPPORT
+    
+    -- Approval Tracking
+    RejectionReason NVARCHAR(500) NULL,
+    ApprovedBy NVARCHAR(100) NULL,
+    ApprovedAt DATETIME2 NULL,
+    SubmittedAt DATETIME2 NULL,
+    
+    -- Audit Fields
     CreatedBy NVARCHAR(100) NULL,
-    RejectionReason NVARCHAR(500) NULL
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    UpdatedAt DATETIME2 NULL
 );
 GO
 
@@ -53,12 +68,13 @@ CREATE TABLE Messages (
     ConversationId INT NULL,
     Channel INT NOT NULL,
     MessageText NVARCHAR(MAX) NOT NULL,
-    Status INT NOT NULL DEFAULT 0,
+    Status INT NOT NULL DEFAULT 0,  -- 0=Pending, 1=Sent, 2=Delivered, 3=Failed, 4=Received, 5=Read
     TwilioMessageId NVARCHAR(100) NULL,
     ScheduledAt DATETIME2 NULL,
     CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     RetryCount INT NOT NULL DEFAULT 0,
     TemplateId INT NULL,
+    IsInbound BIT NOT NULL DEFAULT 0,
     
     CONSTRAINT FK_Messages_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE SET NULL,
     CONSTRAINT FK_Messages_Conversations FOREIGN KEY (ConversationId) REFERENCES Conversations(Id) ON DELETE SET NULL,
@@ -74,7 +90,7 @@ CREATE TABLE TemplateRequests (
     RequestedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     ApprovedBy NVARCHAR(100) NULL,
     ApprovedAt DATETIME2 NULL,
-    Status INT NOT NULL DEFAULT 0,
+    Status INT NOT NULL DEFAULT 0,  -- 0=Pending, 1=Approved, 2=Rejected
     Comments NVARCHAR(500) NULL,
     
     CONSTRAINT FK_TemplateRequests_Templates FOREIGN KEY (TemplateId) REFERENCES Templates(Id) ON DELETE CASCADE
@@ -85,7 +101,7 @@ GO
 CREATE TABLE MessageLogs (
     Id INT IDENTITY(1,1) PRIMARY KEY,
     MessageId INT NOT NULL,
-    EventType INT NOT NULL,
+    EventType INT NOT NULL,  -- 0=Delivered, 1=Failed, 2=Read, 3=Received, 4=Sent, 5=Queued
     EventTimestamp DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     WebhookPayload NVARCHAR(MAX) NULL,
     ErrorMessage NVARCHAR(500) NULL,
@@ -100,9 +116,11 @@ CREATE INDEX IX_Messages_ConversationId ON Messages(ConversationId);
 CREATE INDEX IX_Messages_Status ON Messages(Status);
 CREATE INDEX IX_Messages_ScheduledAt ON Messages(ScheduledAt);
 CREATE INDEX IX_Messages_TwilioMessageId ON Messages(TwilioMessageId);
+CREATE INDEX IX_Messages_CreatedAt ON Messages(CreatedAt);
 CREATE INDEX IX_MessageLogs_MessageId ON MessageLogs(MessageId);
 CREATE INDEX IX_MessageLogs_EventTimestamp ON MessageLogs(EventTimestamp);
 CREATE INDEX IX_Templates_Status ON Templates(Status);
+CREATE INDEX IX_Templates_TwilioContentSid ON Templates(TwilioContentSid);
 CREATE INDEX IX_Conversations_PhoneNumber ON Conversations(PhoneNumber);
 CREATE INDEX IX_Users_Phone ON Users(Phone);
 CREATE INDEX IX_Users_WhatsAppNumber ON Users(WhatsAppNumber);
@@ -122,15 +140,17 @@ VALUES
 ('Charlie Davis', '+6677889900', '+6677889900', 'charlie.davis@example.com', GETUTCDATE());
 GO
 
--- Insert sample templates
-INSERT INTO Templates (Name, Channel, TemplateText, Status, CreatedBy, CreatedAt)
+-- Insert sample templates (with new fields)
+INSERT INTO Templates (Name, Channel, TemplateText, Status, Category, Language, CreatedBy, CreatedAt, UpdatedAt)
 VALUES 
-('welcome_message', 1, 'Hello {{name}}! Welcome to our service. Your account has been created successfully.', 1, 'System', GETUTCDATE()),
-('order_confirmation', 1, 'Hi {{name}}, your order #{{order_id}} has been confirmed! We will notify you when it ships.', 1, 'System', GETUTCDATE()),
-('shipping_notification', 1, 'Great news {{name}}! Your order #{{order_id}} has been shipped and is on its way!', 1, 'System', GETUTCDATE()),
-('password_reset', 1, '{{name}}, your password reset code is: {{code}}. This code expires in 24 hours.', 0, 'System', GETUTCDATE()),
-('promotional_offer', 1, 'Hello {{name}}! Special offer just for you: {{discount}}% off on your next purchase!', 0, 'Marketing', GETUTCDATE()),
-('appointment_reminder', 1, 'Hi {{name}}, this is a reminder for your appointment on {{date}} at {{time}}. Reply CONFIRM to confirm.', 1, 'System', GETUTCDATE());
+('welcome_message', 1, 'Hello {{name}}! Welcome to our service. Your account has been created successfully.', 1, 'TRANSACTIONAL', 'en_US', 'System', GETUTCDATE(), GETUTCDATE()),
+('order_confirmation', 1, 'Hi {{name}}, your order #{{order_id}} has been confirmed! We will notify you when it ships.', 1, 'TRANSACTIONAL', 'en_US', 'System', GETUTCDATE(), GETUTCDATE()),
+('shipping_notification', 1, 'Great news {{name}}! Your order #{{order_id}} has been shipped and is on its way!', 1, 'TRANSACTIONAL', 'en_US', 'System', GETUTCDATE(), GETUTCDATE()),
+('password_reset', 1, '{{name}}, your password reset code is: {{code}}. This code expires in 24 hours.', 0, 'OTP', 'en_US', 'System', GETUTCDATE(), GETUTCDATE()),
+('promotional_offer', 1, 'Hello {{name}}! Special offer just for you: {{discount}}% off on your next purchase!', 0, 'MARKETING', 'en_US', 'Marketing', GETUTCDATE(), GETUTCDATE()),
+('appointment_reminder', 1, 'Hi {{name}}, this is a reminder for your appointment on {{date}} at {{time}}. Reply CONFIRM to confirm.', 1, 'TRANSACTIONAL', 'en_US', 'System', GETUTCDATE(), GETUTCDATE()),
+('account_update', 1, 'Hello {{name}}, your account has been updated. Log in to see the changes.', 1, 'TRANSACTIONAL', 'en_US', 'System', GETUTCDATE(), GETUTCDATE()),
+('feedback_request', 1, 'Hi {{name}}, thanks for using our service! We''d love your feedback: {{feedback_link}}', 1, 'MARKETING', 'en_US', 'System', GETUTCDATE(), GETUTCDATE());
 GO
 
 -- Insert sample conversations
@@ -142,32 +162,41 @@ VALUES
 GO
 
 -- Insert sample messages
-INSERT INTO Messages (UserId, ConversationId, Channel, MessageText, Status, TwilioMessageId, CreatedAt, RetryCount)
+INSERT INTO Messages (UserId, ConversationId, Channel, MessageText, Status, TwilioMessageId, CreatedAt, RetryCount, TemplateId)
 VALUES 
-(1, 1, 1, 'Hello! How can I help you today?', 2, 'SM1234567890abcdef', GETUTCDATE(), 0),
-(1, 1, 1, 'Thank you for your quick response!', 2, 'SM0987654321fedcba', GETUTCDATE(), 0),
-(2, 2, 1, 'I have a question about my order.', 4, NULL, GETUTCDATE(), 0),
-(3, NULL, 0, 'Your OTP is 123456', 1, 'SM111111111111111', GETUTCDATE(), 0),
-(NULL, 3, 1, 'I want to learn more about your services.', 4, NULL, DATEADD(DAY, -1, GETUTCDATE()), 0);
+(1, 1, 1, 'Hello! How can I help you today?', 2, 'SM1234567890abcdef', GETUTCDATE(), 0, NULL),
+(1, 1, 1, 'Thank you for your quick response!', 2, 'SM0987654321fedcba', GETUTCDATE(), 0, NULL),
+(2, 2, 1, 'I have a question about my order.', 4, NULL, GETUTCDATE(), 0, NULL),
+(3, NULL, 0, 'Your OTP is 123456', 1, 'SM111111111111111', GETUTCDATE(), 0, NULL),
+(NULL, 3, 1, 'I want to learn more about your services.', 4, NULL, DATEADD(DAY, -1, GETUTCDATE()), 0, NULL),
+(1, NULL, 1, 'Hello {{name}}! Welcome to our service.', 1, 'SM_welcome_template', GETUTCDATE(), 0, 1),
+(2, NULL, 1, 'Hi {{name}}, your order #{{order_id}} has been confirmed!', 1, 'SM_order_template', GETUTCDATE(), 0, 2);
 GO
 
 -- Insert sample message logs
-INSERT INTO MessageLogs (MessageId, EventType, EventTimestamp, WebhookPayload)
+INSERT INTO MessageLogs (MessageId, EventType, EventTimestamp, WebhookPayload, ErrorMessage)
 VALUES 
-(1, 4, GETUTCDATE(), '{"MessageSid": "SM1234567890abcdef", "Status": "sent"}'),
-(1, 0, DATEADD(MINUTE, 1, GETUTCDATE()), '{"MessageSid": "SM1234567890abcdef", "Status": "delivered"}'),
-(2, 4, GETUTCDATE(), '{"MessageSid": "SM0987654321fedcba", "Status": "sent"}'),
-(3, 3, GETUTCDATE(), '{"From": "whatsapp:+0987654321", "Body": "I have a question about my order.", "MessageSid": "SM222222222222222"}'),
-(4, 4, GETUTCDATE(), '{"MessageSid": "SM111111111111111", "Status": "sent"}'),
-(5, 3, DATEADD(DAY, -1, GETUTCDATE()), '{"From": "whatsapp:+1122334455", "Body": "I want to learn more about your services.", "MessageSid": "SM333333333333333"}');
+(1, 4, GETUTCDATE(), '{"MessageSid": "SM1234567890abcdef", "Status": "sent"}', NULL),
+(1, 0, DATEADD(MINUTE, 1, GETUTCDATE()), '{"MessageSid": "SM1234567890abcdef", "Status": "delivered"}', NULL),
+(2, 4, GETUTCDATE(), '{"MessageSid": "SM0987654321fedcba", "Status": "sent"}', NULL),
+(3, 3, GETUTCDATE(), '{"From": "whatsapp:+0987654321", "Body": "I have a question about my order.", "MessageSid": "SM222222222222222"}', NULL),
+(4, 4, GETUTCDATE(), '{"MessageSid": "SM111111111111111", "Status": "sent"}', NULL),
+(5, 3, DATEADD(DAY, -1, GETUTCDATE()), '{"From": "whatsapp:+1122334455", "Body": "I want to learn more about your services.", "MessageSid": "SM333333333333333"}', NULL),
+(6, 4, GETUTCDATE(), '{"MessageSid": "SM_welcome_template", "Status": "sent"}', NULL),
+(6, 0, DATEADD(SECOND, 30, GETUTCDATE()), '{"MessageSid": "SM_welcome_template", "Status": "delivered"}', NULL),
+(7, 4, GETUTCDATE(), '{"MessageSid": "SM_order_template", "Status": "sent"}', NULL);
 GO
 
 -- Insert sample template requests
-INSERT INTO TemplateRequests (TemplateId, RequestedBy, RequestedAt, Status)
+INSERT INTO TemplateRequests (TemplateId, RequestedBy, RequestedAt, Status, ApprovedBy, ApprovedAt, Comments)
 VALUES 
-(4, 'System', GETUTCDATE(), 1),
-(5, 'Marketing', GETUTCDATE(), 0),
-(6, 'System', GETUTCDATE(), 1);
+(4, 'System', GETUTCDATE(), 1, 'Admin', GETUTCDATE(), 'Approved for OTP use'),
+(5, 'Marketing', DATEADD(HOUR, -2, GETUTCDATE()), 0, NULL, NULL, NULL),
+(6, 'System', GETUTCDATE(), 1, 'Admin', GETUTCDATE(), NULL);
+GO
+
+-- Update templates with approval info
+UPDATE Templates SET ApprovedBy = 'Admin', ApprovedAt = GETUTCDATE() WHERE Id IN (1, 2, 3, 6, 7, 8);
 GO
 
 -- Print summary
@@ -178,11 +207,23 @@ PRINT '';
 
 DECLARE @UserCount INT = (SELECT COUNT(*) FROM Users);
 DECLARE @TemplateCount INT = (SELECT COUNT(*) FROM Templates);
+DECLARE @ApprovedTemplates INT = (SELECT COUNT(*) FROM Templates WHERE Status = 1);
 DECLARE @MessageCount INT = (SELECT COUNT(*) FROM Messages);
 DECLARE @ConversationCount INT = (SELECT COUNT(*) FROM Conversations);
+DECLARE @MessageLogCount INT = (SELECT COUNT(*) FROM MessageLogs);
 
 PRINT 'Users: ' + CAST(@UserCount AS VARCHAR(10));
-PRINT 'Templates: ' + CAST(@TemplateCount AS VARCHAR(10));
+PRINT 'Templates: ' + CAST(@TemplateCount AS VARCHAR(10)) + ' (Approved: ' + CAST(@ApprovedTemplates AS VARCHAR(10)) + ')';
 PRINT 'Messages: ' + CAST(@MessageCount AS VARCHAR(10));
 PRINT 'Conversations: ' + CAST(@ConversationCount AS VARCHAR(10));
+PRINT 'Message Logs: ' + CAST(@MessageLogCount AS VARCHAR(10));
+PRINT '';
+PRINT '========================================';
+PRINT 'Template Status Legend:';
+PRINT '  -1 = Draft';
+PRINT '   0 = Pending Approval';
+PRINT '   1 = Approved';
+PRINT '   2 = Rejected';
+PRINT '   3 = Archived';
+PRINT '========================================';
 GO

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace WhatsAppMvcComplete.Models;
 
 public enum MessageChannel
@@ -30,8 +32,9 @@ public class Message
     public int RetryCount { get; set; }
     public int? TemplateId { get; set; }
     
-    // Backward compatibility properties
-    public string Body 
+    // Backward compatibility property - not mapped to database
+    [NotMapped]
+    public string Body
     { 
         get => MessageText ?? string.Empty;
         set => MessageText = value ?? string.Empty;
